@@ -886,6 +886,30 @@ body {
     justify-content: center;
 }
 
+.pdf-preview {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg);
+    gap: 4px;
+    padding: 8px;
+}
+
+.pdf-icon {
+    font-size: 36px;
+}
+
+.pdf-label {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    text-align: center;
+    word-break: break-all;
+    line-height: 1.2;
+}
+
 .image-fullview-overlay {
     position: fixed;
     top: 0;

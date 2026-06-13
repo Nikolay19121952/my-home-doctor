@@ -86,7 +86,8 @@ var Analyses = {
                 html += '<div class="analysis-card-clinic">' + UI.escapeHtml(a.clinic) + '</div>';
             }
             if (a.imageIds && a.imageIds.length > 0) {
-                html += '<div class="analysis-card-photos">📷 ' + a.imageIds.length + ' фото</div>';
+                var fileWord = a.imageIds.length === 1 ? 'файл' : (a.imageIds.length < 5 ? 'файла' : 'файлов');
+                html += '<div class="analysis-card-photos">📎 ' + a.imageIds.length + ' ' + fileWord + '</div>';
             }
             html += '</div>';
         }
@@ -123,20 +124,31 @@ var Analyses = {
         var gallery = document.getElementById('analysis-view-gallery');
         gallery.innerHTML = '';
         if (analysis.imageIds && analysis.imageIds.length > 0) {
-            gallery.innerHTML = '<div class="view-label" style="margin-bottom:8px">Фотографии</div><div class="image-preview-grid" id="view-gallery-grid"></div>';
+            gallery.innerHTML = '<div class="view-label" style="margin-bottom:8px">Файлы</div><div class="image-preview-grid" id="view-gallery-grid"></div>';
             var grid = document.getElementById('view-gallery-grid');
             for (var i = 0; i < analysis.imageIds.length; i++) {
                 (function (imgId) {
                     DB.getImage(imgId, function (record) {
                         if (!record) return;
-                        var url = URL.createObjectURL(record.blob);
-                        Analyses._objectUrls.push(url);
                         var div = document.createElement('div');
                         div.className = 'image-preview-item';
-                        div.innerHTML = '<img src="' + url + '" alt="Фото анализа">';
-                        div.addEventListener('click', function () {
-                            Analyses.showFullImage(url);
-                        });
+
+                        if (Analyses._isPdf(record)) {
+                            var name = record.fileName || 'document.pdf';
+                            if (name.length > 20) name = name.substring(0, 17) + '...';
+                            div.innerHTML = '<div class="pdf-preview"><span class="pdf-icon">📄</span><span class="pdf-label">' + UI.escapeHtml(name) + '</span></div>';
+                            div.addEventListener('click', function () {
+                                Analyses.openPdf(record);
+                            });
+                        } else {
+                            var url = URL.createObjectURL(record.blob);
+                            Analyses._objectUrls.push(url);
+                            div.innerHTML = '<img src="' + url + '" alt="Фото анализа">';
+                            div.addEventListener('click', function () {
+                                Analyses.showFullImage(url);
+                            });
+                        }
+
                         grid.appendChild(div);
                     });
                 })(analysis.imageIds[i]);
@@ -150,6 +162,16 @@ var Analyses = {
         var overlay = document.getElementById('image-fullview-overlay');
         document.getElementById('image-fullview-img').src = url;
         overlay.style.display = 'flex';
+    },
+
+    openPdf: function (record) {
+        var url = URL.createObjectURL(record.blob);
+        Analyses._objectUrls.push(url);
+        var a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.download = record.fileName || 'document.pdf';
+        a.click();
     },
 
     openForm: function (id) {
@@ -190,17 +212,34 @@ var Analyses = {
 
         for (var i = 0; i < files.length; i++) {
             (function (file) {
-                DB.resizeImage(file, 1600, 0.8, function (blob) {
-                    DB.saveImage(blob, file.name, function (id) {
+                var isPdf = file.type === 'application/pdf' || file.name.toLowerCase().indexOf('.pdf') !== -1;
+                if (isPdf) {
+                    DB.saveImage(file, file.name, function (id) {
                         if (id) {
                             Analyses._pendingImages.push(id);
                             Analyses._renderPreviews();
                         }
                     });
-                });
+                } else {
+                    DB.resizeImage(file, 1600, 0.8, function (blob) {
+                        DB.saveImage(blob, file.name, function (id) {
+                            if (id) {
+                                Analyses._pendingImages.push(id);
+                                Analyses._renderPreviews();
+                            }
+                        });
+                    });
+                }
             })(files[i]);
         }
         e.target.value = '';
+    },
+
+    _isPdf: function (record) {
+        if (!record) return false;
+        if (record.mimeType === 'application/pdf') return true;
+        if (record.fileName && record.fileName.toLowerCase().indexOf('.pdf') !== -1) return true;
+        return false;
     },
 
     _renderPreviews: function () {
@@ -210,12 +249,21 @@ var Analyses = {
             (function (imgId, idx) {
                 DB.getImage(imgId, function (record) {
                     if (!record) return;
-                    var url = URL.createObjectURL(record.blob);
-                    Analyses._objectUrls.push(url);
                     var div = document.createElement('div');
                     div.className = 'image-preview-item';
-                    div.innerHTML = '<img src="' + url + '" alt="Превью">' +
-                        '<button type="button" class="image-remove-btn" data-idx="' + idx + '">✕</button>';
+
+                    if (Analyses._isPdf(record)) {
+                        var name = record.fileName || 'document.pdf';
+                        if (name.length > 20) name = name.substring(0, 17) + '...';
+                        div.innerHTML = '<div class="pdf-preview"><span class="pdf-icon">📄</span><span class="pdf-label">' + UI.escapeHtml(name) + '</span></div>' +
+                            '<button type="button" class="image-remove-btn" data-idx="' + idx + '">✕</button>';
+                    } else {
+                        var url = URL.createObjectURL(record.blob);
+                        Analyses._objectUrls.push(url);
+                        div.innerHTML = '<img src="' + url + '" alt="Превью">' +
+                            '<button type="button" class="image-remove-btn" data-idx="' + idx + '">✕</button>';
+                    }
+
                     div.querySelector('.image-remove-btn').addEventListener('click', function (e) {
                         e.stopPropagation();
                         var removeIdx = parseInt(this.getAttribute('data-idx'));
