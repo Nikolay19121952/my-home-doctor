@@ -33,6 +33,8 @@
                     <p>Это ваш персональный помощник для ведения медицинской карты семьи.</p>
                 </div>
 
+                <div id="home-summary"></div>
+
                 <div class="quick-actions">
                     <h3>Быстрые действия</h3>
                     <button class="action-card" data-navigate="profiles">
@@ -45,10 +47,15 @@
                         <span class="action-label">Дневник здоровья</span>
                         <span class="action-desc">Давление, пульс, сахар</span>
                     </button>
-                    <button class="action-card" data-navigate="more">
+                    <button class="action-card" data-navigate="analyses">
                         <span class="action-icon">📄</span>
                         <span class="action-label">Анализы</span>
                         <span class="action-desc">Результаты обследований</span>
+                    </button>
+                    <button class="action-card" data-navigate="reminders">
+                        <span class="action-icon">🔔</span>
+                        <span class="action-label">Напоминания</span>
+                        <span class="action-desc">Лекарства и визиты</span>
                     </button>
                 </div>
             </div>
@@ -169,35 +176,342 @@
             </div>
         </section>
 
-        <!-- Дневник здоровья (заглушка) -->
+        <!-- Дневник здоровья -->
         <section id="diary" class="page">
             <div class="container">
-                <div class="placeholder-card">
-                    <div class="placeholder-icon">📋</div>
+                <div class="section-header">
                     <h2>Дневник здоровья</h2>
-                    <p>Здесь вы сможете записывать ежедневные показатели: давление, пульс, уровень сахара, температуру и вес.</p>
-                    <p class="placeholder-note">Этот раздел находится в разработке</p>
+                    <button id="btn-add-diary" class="btn btn-primary">
+                        <span class="btn-icon">+</span> Запись
+                    </button>
+                </div>
+
+                <div id="diary-profile-selector"></div>
+
+                <div id="diary-chart-container" style="display: none;">
+                    <div class="chart-controls">
+                        <div class="chart-metrics">
+                            <button class="chart-metric-btn active" data-metric="bp">Давление</button>
+                            <button class="chart-metric-btn" data-metric="pulse">Пульс</button>
+                            <button class="chart-metric-btn" data-metric="sugar">Сахар</button>
+                            <button class="chart-metric-btn" data-metric="temperature">Темп.</button>
+                            <button class="chart-metric-btn" data-metric="weight">Вес</button>
+                        </div>
+                        <div class="chart-periods">
+                            <button class="chart-period-btn active" data-days="7">7 дн.</button>
+                            <button class="chart-period-btn" data-days="30">30 дн.</button>
+                        </div>
+                    </div>
+                    <div id="diary-chart-area" class="diary-chart-area"></div>
+                </div>
+
+                <div id="diary-list"></div>
+
+                <div id="diary-empty" class="empty-state" style="display: none;">
+                    <div class="empty-icon">📋</div>
+                    <h3>Записей пока нет</h3>
+                    <p>Добавьте первую запись с вашими показателями здоровья.</p>
+                    <button class="btn btn-primary btn-large" id="btn-add-diary-empty">
+                        <span class="btn-icon">+</span> Добавить запись
+                    </button>
                 </div>
             </div>
         </section>
 
-        <!-- Ещё (анализы, напоминания, настройки) -->
+        <!-- Форма дневника -->
+        <section id="diary-form" class="page">
+            <div class="container">
+                <div class="section-header">
+                    <button id="btn-back-diary-form" class="btn btn-outline btn-back">← Назад</button>
+                    <h2 id="diary-form-title">Новая запись</h2>
+                </div>
+                <form id="form-diary" novalidate>
+                    <div class="form-row">
+                        <div class="form-group form-group-half">
+                            <label for="diary-date">Дата</label>
+                            <input type="date" id="diary-date">
+                        </div>
+                        <div class="form-group form-group-half">
+                            <label for="diary-time">Время</label>
+                            <input type="time" id="diary-time">
+                        </div>
+                    </div>
+
+                    <div class="measurement-group">
+                        <h3 class="measurement-title">Артериальное давление</h3>
+                        <div class="form-row">
+                            <div class="form-group form-group-half">
+                                <label for="diary-systolic">Верхнее (систол.)</label>
+                                <input type="number" id="diary-systolic" placeholder="120" min="50" max="300" inputmode="numeric">
+                                <span class="form-hint">мм рт.ст.</span>
+                            </div>
+                            <div class="form-group form-group-half">
+                                <label for="diary-diastolic">Нижнее (диастол.)</label>
+                                <input type="number" id="diary-diastolic" placeholder="80" min="30" max="200" inputmode="numeric">
+                                <span class="form-hint">мм рт.ст.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="measurement-group">
+                        <h3 class="measurement-title">Другие показатели</h3>
+                        <div class="form-row">
+                            <div class="form-group form-group-half">
+                                <label for="diary-pulse">Пульс</label>
+                                <input type="number" id="diary-pulse" placeholder="72" min="20" max="250" inputmode="numeric">
+                                <span class="form-hint">уд/мин</span>
+                            </div>
+                            <div class="form-group form-group-half">
+                                <label for="diary-sugar">Сахар в крови</label>
+                                <input type="text" id="diary-sugar" placeholder="5.5" inputmode="decimal">
+                                <span class="form-hint">ммоль/л</span>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group form-group-half">
+                                <label for="diary-temperature">Температура</label>
+                                <input type="text" id="diary-temperature" placeholder="36.6" inputmode="decimal">
+                                <span class="form-hint">°C</span>
+                            </div>
+                            <div class="form-group form-group-half">
+                                <label for="diary-weight">Вес</label>
+                                <input type="text" id="diary-weight" placeholder="75" inputmode="decimal">
+                                <span class="form-hint">кг</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="diary-notes">Заметки</label>
+                        <textarea id="diary-notes" rows="2" placeholder="Например: после прогулки, натощак"></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-large btn-full">Сохранить</button>
+                        <button type="button" id="btn-cancel-diary" class="btn btn-outline btn-large btn-full">Отмена</button>
+                    </div>
+
+                    <div id="delete-diary-section" class="delete-section" style="display: none;">
+                        <hr class="divider">
+                        <button type="button" id="btn-delete-diary-entry" class="btn btn-danger btn-large btn-full">Удалить запись</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Анализы и обследования -->
+        <section id="analyses" class="page">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Анализы</h2>
+                    <button id="btn-add-analysis" class="btn btn-primary">
+                        <span class="btn-icon">+</span> Добавить
+                    </button>
+                </div>
+
+                <div id="analyses-profile-selector"></div>
+                <div id="analyses-list"></div>
+
+                <div id="analyses-empty" class="empty-state" style="display: none;">
+                    <div class="empty-icon">📄</div>
+                    <h3>Анализов пока нет</h3>
+                    <p>Добавьте результаты анализов и обследований.</p>
+                    <button class="btn btn-primary btn-large" id="btn-add-analysis-empty">
+                        <span class="btn-icon">+</span> Добавить анализ
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Форма анализа -->
+        <section id="analysis-form" class="page">
+            <div class="container">
+                <div class="section-header">
+                    <button id="btn-back-analysis-form" class="btn btn-outline btn-back">← Назад</button>
+                    <h2 id="analysis-form-title">Новый анализ</h2>
+                </div>
+                <form id="form-analysis" novalidate>
+                    <div class="form-group">
+                        <label for="analysis-date">Дата</label>
+                        <input type="date" id="analysis-date">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="analysis-type">Тип анализа <span class="required">*</span></label>
+                        <select id="analysis-type">
+                            <option value="">Выберите тип</option>
+                            <option value="Анализ крови">Анализ крови</option>
+                            <option value="Анализ мочи">Анализ мочи</option>
+                            <option value="Рентген">Рентген</option>
+                            <option value="УЗИ">УЗИ</option>
+                            <option value="ЭКГ">ЭКГ</option>
+                            <option value="МРТ">МРТ</option>
+                            <option value="КТ">КТ</option>
+                            <option value="Другое">Другое</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="analysis-title">Название</label>
+                        <input type="text" id="analysis-title" placeholder="Например: Общий анализ крови">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="analysis-clinic">Клиника / лаборатория</label>
+                        <input type="text" id="analysis-clinic" placeholder="Например: Поликлиника №5">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="analysis-notes-field">Заметки</label>
+                        <textarea id="analysis-notes-field" rows="3" placeholder="Результаты, комментарии врача"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Фотографии</label>
+                        <div class="image-upload-buttons">
+                            <button type="button" id="analysis-photo-btn" class="btn btn-outline">📷 Снимок</button>
+                            <button type="button" id="analysis-file-btn" class="btn btn-outline">📁 Из файлов</button>
+                        </div>
+                        <input type="file" id="analysis-camera-input" accept="image/*" capture="environment" style="display:none">
+                        <input type="file" id="analysis-file-input" accept="image/*" multiple style="display:none">
+                        <div id="analysis-preview-grid" class="image-preview-grid"></div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-large btn-full">Сохранить</button>
+                        <button type="button" id="btn-cancel-analysis" class="btn btn-outline btn-large btn-full">Отмена</button>
+                    </div>
+
+                    <div id="delete-analysis-section" class="delete-section" style="display: none;">
+                        <hr class="divider">
+                        <button type="button" id="btn-delete-analysis" class="btn btn-danger btn-large btn-full">Удалить анализ</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Просмотр анализа -->
+        <section id="analysis-view" class="page">
+            <div class="container">
+                <div class="section-header">
+                    <button id="btn-back-analysis-view" class="btn btn-outline btn-back">← Назад</button>
+                    <h2 id="analysis-view-title">Анализ</h2>
+                </div>
+                <div id="analysis-view-content"></div>
+                <div id="analysis-view-gallery"></div>
+                <div class="form-actions" style="margin-top: 24px;">
+                    <button id="btn-edit-analysis" class="btn btn-primary btn-large btn-full">Редактировать</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Напоминания -->
+        <section id="reminders" class="page">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Напоминания</h2>
+                    <button id="btn-add-reminder" class="btn btn-primary">
+                        <span class="btn-icon">+</span> Добавить
+                    </button>
+                </div>
+
+                <div id="reminders-profile-selector"></div>
+
+                <div class="reminder-tabs">
+                    <button class="reminder-tab active" id="tab-active-reminders">Активные</button>
+                    <button class="reminder-tab" id="tab-completed-reminders">Выполненные</button>
+                </div>
+
+                <div id="reminders-list"></div>
+
+                <div id="reminders-empty" class="empty-state" style="display: none;">
+                    <div class="empty-icon">🔔</div>
+                    <h3>Напоминаний нет</h3>
+                    <p>Создайте напоминание о приёме лекарств или визите к врачу.</p>
+                    <button class="btn btn-primary btn-large" id="btn-add-reminder-empty">
+                        <span class="btn-icon">+</span> Добавить напоминание
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Форма напоминания -->
+        <section id="reminder-form" class="page">
+            <div class="container">
+                <div class="section-header">
+                    <button id="btn-back-reminder-form" class="btn btn-outline btn-back">← Назад</button>
+                    <h2 id="reminder-form-title">Новое напоминание</h2>
+                </div>
+                <form id="form-reminder" novalidate>
+                    <div class="form-group">
+                        <label>Тип</label>
+                        <div class="reminder-type-selector">
+                            <button type="button" class="reminder-type-btn active" data-type="medication">💊 Лекарство</button>
+                            <button type="button" class="reminder-type-btn" data-type="appointment">👨‍⚕️ Визит</button>
+                            <button type="button" class="reminder-type-btn" data-type="test">🔬 Анализ</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reminder-title">Название <span class="required">*</span></label>
+                        <input type="text" id="reminder-title" placeholder="Например: Принять Метформин" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group form-group-half">
+                            <label for="reminder-date">Дата</label>
+                            <input type="date" id="reminder-date">
+                        </div>
+                        <div class="form-group form-group-half">
+                            <label for="reminder-time">Время</label>
+                            <input type="time" id="reminder-time">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reminder-repeat">Повтор</label>
+                        <select id="reminder-repeat">
+                            <option value="once">Однократно</option>
+                            <option value="daily">Ежедневно</option>
+                            <option value="weekly">Еженедельно</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reminder-notes-field">Заметки</label>
+                        <textarea id="reminder-notes-field" rows="2" placeholder="Дополнительная информация"></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-large btn-full">Сохранить</button>
+                        <button type="button" id="btn-cancel-reminder" class="btn btn-outline btn-large btn-full">Отмена</button>
+                    </div>
+
+                    <div id="delete-reminder-section" class="delete-section" style="display: none;">
+                        <hr class="divider">
+                        <button type="button" id="btn-delete-reminder" class="btn btn-danger btn-large btn-full">Удалить напоминание</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Ещё (настройки) -->
         <section id="more" class="page">
             <div class="container">
                 <h2 style="margin-bottom: 16px;">Ещё</h2>
                 <div class="more-list">
-                    <button class="more-item" disabled>
+                    <button class="more-item" data-navigate="analyses">
                         <span class="more-icon">📄</span>
                         <div class="more-text">
                             <span class="more-label">Анализы и обследования</span>
-                            <span class="more-desc">В разработке</span>
+                            <span class="more-desc">Результаты и фотографии</span>
                         </div>
                     </button>
-                    <button class="more-item" disabled>
+                    <button class="more-item" data-navigate="reminders">
                         <span class="more-icon">🔔</span>
                         <div class="more-text">
                             <span class="more-label">Напоминания</span>
-                            <span class="more-desc">В разработке</span>
+                            <span class="more-desc">Лекарства и визиты к врачу</span>
                         </div>
                     </button>
                     <button class="more-item" disabled>
@@ -250,6 +564,11 @@
         </button>
     </nav>
 
+    <!-- Полноэкранный просмотр изображений -->
+    <div id="image-fullview-overlay" class="image-fullview-overlay" style="display: none;">
+        <img id="image-fullview-img" src="" alt="Полный размер">
+    </div>
+
     <!-- Модальное окно -->
     <div id="modal-overlay" class="modal-overlay" style="display: none;">
         <div class="modal">
@@ -266,8 +585,12 @@
     <div id="toast" class="toast" style="display: none;"></div>
 
     <script src="js/ui.js"></script>
+    <script src="js/db.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/profiles.js"></script>
+    <script src="js/diary.js"></script>
+    <script src="js/analyses.js"></script>
+    <script src="js/reminders.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
