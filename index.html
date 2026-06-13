@@ -522,6 +522,29 @@
                         </div>
                     </button>
                 </div>
+
+                <h3 style="margin-top: 24px; margin-bottom: 12px;">Перенос данных</h3>
+                <p style="color: var(--color-text-secondary); font-size: 16px; margin-bottom: 16px;">
+                    Экспортируйте данные, чтобы перенести их в другой браузер или на другое устройство.
+                </p>
+                <div class="more-list">
+                    <button class="more-item" id="btn-export-data">
+                        <span class="more-icon">📤</span>
+                        <div class="more-text">
+                            <span class="more-label">Экспорт данных</span>
+                            <span class="more-desc">Сохранить всё в файл</span>
+                        </div>
+                    </button>
+                    <button class="more-item" id="btn-import-data">
+                        <span class="more-icon">📥</span>
+                        <div class="more-text">
+                            <span class="more-label">Импорт данных</span>
+                            <span class="more-desc">Загрузить из файла</span>
+                        </div>
+                    </button>
+                </div>
+                <input type="file" id="import-file-input" accept=".json" style="display:none">
+                <div id="import-progress" style="display:none; margin-top:16px; text-align:center; color: var(--color-primary); font-weight:600;"></div>
             </div>
         </section>
     </main>
@@ -591,6 +614,7 @@
     <script src="js/diary.js"></script>
     <script src="js/analyses.js"></script>
     <script src="js/reminders.js"></script>
+    <script src="js/transfer.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

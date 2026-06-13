@@ -1,4 +1,4 @@
-var CACHE_NAME = 'mdd-v3';
+var CACHE_NAME = 'mdd-v4';
 var ASSETS = [
     './',
     './index.html',
@@ -11,6 +11,7 @@ var ASSETS = [
     './js/diary.js',
     './js/analyses.js',
     './js/reminders.js',
+    './js/transfer.js',
     './manifest.json',
     './icons/icon-192.png',
     './icons/icon-512.png'

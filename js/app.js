@@ -12,6 +12,7 @@ var App = {
             Diary.init();
             Analyses.init();
             Reminders.init();
+            Transfer.init();
             Reminders.startChecker();
             Reminders.requestNotificationPermission();
 
