@@ -42,15 +42,13 @@ var Transfer = {
             return;
         }
 
-        progressEl.textContent = 'Экспорт изображений (0/' + allImageIds.length + ')...';
-        var loaded = 0;
+        progressEl.textContent = 'Экспорт файлов (0/' + allImageIds.length + ')...';
+        var completed = 0;
+        var total = allImageIds.length;
 
         for (var k = 0; k < allImageIds.length; k++) {
             (function (imgId) {
                 DB.getImage(imgId, function (record) {
-                    loaded++;
-                    progressEl.textContent = 'Экспорт изображений (' + loaded + '/' + allImageIds.length + ')...';
-
                     if (record && record.blob) {
                         var reader = new FileReader();
                         reader.onload = function () {
@@ -62,14 +60,18 @@ var Transfer = {
                                 createdAt: record.createdAt,
                                 dataUrl: reader.result
                             });
-                            if (loaded === allImageIds.length) {
+                            completed++;
+                            progressEl.textContent = 'Экспорт файлов (' + completed + '/' + total + ')...';
+                            if (completed === total) {
                                 Transfer._downloadJson(data);
                                 progressEl.style.display = 'none';
                             }
                         };
                         reader.readAsDataURL(record.blob);
                     } else {
-                        if (loaded === allImageIds.length) {
+                        completed++;
+                        progressEl.textContent = 'Экспорт файлов (' + completed + '/' + total + ')...';
+                        if (completed === total) {
                             Transfer._downloadJson(data);
                             progressEl.style.display = 'none';
                         }

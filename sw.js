@@ -1,4 +1,4 @@
-var CACHE_NAME = 'mdd-v4';
+var CACHE_NAME = 'mdd-v5';
 var ASSETS = [
     './',
     './index.html',
