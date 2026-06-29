@@ -1,17 +1,15 @@
-var CACHE_NAME = 'mdd-v5';
+var CACHE_NAME = 'mdd-v4';
 var ASSETS = [
     './',
     './index.html',
     './css/styles.css',
     './js/app.js',
-    './js/ui.js',
-    './js/db.js',
     './js/storage.js',
     './js/profiles.js',
+    './js/doctor.js',
     './js/diary.js',
-    './js/analyses.js',
-    './js/reminders.js',
-    './js/transfer.js',
+    './js/more.js',
+    './js/ui.js',
     './manifest.json',
     './icons/icon-192.png',
     './icons/icon-512.png'
@@ -40,6 +38,10 @@ self.addEventListener('activate', function (event) {
 });
 
 self.addEventListener('fetch', function (event) {
+    if (event.request.url.includes('/api/')) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
     event.respondWith(
         caches.match(event.request).then(function (cached) {
             return cached || fetch(event.request);
