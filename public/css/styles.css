@@ -257,6 +257,12 @@ body {
     width: 100%;
 }
 
+.btn-print {
+    margin-top: 10px;
+    width: 100%;
+    font-size: 14px;
+}
+
 .btn-back {
     flex-shrink: 0;
 }
