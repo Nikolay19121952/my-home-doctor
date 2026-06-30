@@ -63,11 +63,13 @@ var More = {
         html += '<div id="reminder-form" style="display:none;" class="card-form">' +
             '<div class="form-group"><label for="reminder-text">Напоминание</label>' +
             '<input type="text" id="reminder-text" placeholder="Принять лекарство, визит к врачу..."></div>' +
-            '<div class="form-row"><div class="form-group form-group-half"><label for="reminder-time">Время</label>' +
-            '<input type="time" id="reminder-time"></div>' +
-            '<div class="form-group form-group-half"><label for="reminder-repeat">Повтор</label>' +
+            '<div class="form-row"><div class="form-group form-group-half"><label for="reminder-date">Дата</label>' +
+            '<input type="date" id="reminder-date"></div>' +
+            '<div class="form-group form-group-half"><label for="reminder-time">Время</label>' +
+            '<input type="time" id="reminder-time"></div></div>' +
+            '<div class="form-group"><label for="reminder-repeat">Повтор</label>' +
             '<select id="reminder-repeat"><option value="daily">Ежедневно</option><option value="once">Однократно</option>' +
-            '<option value="weekly">Еженедельно</option></select></div></div>' +
+            '<option value="weekly">Еженедельно</option></select></div>' +
             '<div class="form-actions" style="flex-direction:row;"><button class="btn btn-primary" onclick="More.addReminder()">Сохранить</button>' +
             '<button class="btn btn-outline" onclick="More.hideReminderForm()">Отмена</button></div></div>';
 
@@ -82,13 +84,16 @@ var More = {
             for (var i = 0; i < reminders.length; i++) {
                 var r = reminders[i];
                 var repeatText = r.repeat === 'daily' ? 'Ежедневно' : r.repeat === 'weekly' ? 'Еженедельно' : 'Однократно';
+                var datePart = r.date ? r.date + ' ' : '';
                 html += '<div class="reminder-card">' +
                     '<div class="reminder-info">' +
                     '<span class="reminder-text">' + UI.escapeHtml(r.text) + '</span>' +
-                    '<span class="reminder-meta">' + UI.escapeHtml(r.time || '') + ' · ' + repeatText + '</span>' +
+                    '<span class="reminder-meta">' + UI.escapeHtml(datePart + (r.time || '')) + ' · ' + repeatText + '</span>' +
                     '</div>' +
+                    '<div class="reminder-actions">' +
+                    '<button class="btn btn-outline btn-small btn-gcal" onclick="More.addToGoogleCalendar(\'' + r.id + '\')" title="Добавить в Google Календарь">📅</button>' +
                     '<button class="diary-delete-btn" onclick="More.deleteReminder(\'' + r.id + '\')" title="Удалить">✕</button>' +
-                    '</div>';
+                    '</div></div>';
             }
             html += '</div>';
         }
@@ -108,6 +113,7 @@ var More = {
 
     addReminder: function () {
         var text = document.getElementById('reminder-text').value.trim();
+        var date = document.getElementById('reminder-date').value;
         var time = document.getElementById('reminder-time').value;
         var repeat = document.getElementById('reminder-repeat').value;
 
@@ -120,6 +126,7 @@ var More = {
         reminders.push({
             id: Storage.generateId(),
             text: text,
+            date: date,
             time: time,
             repeat: repeat,
             createdAt: new Date().toISOString()
@@ -127,6 +134,40 @@ var More = {
         More.saveReminders(reminders);
         More.renderReminders(document.querySelector('#more .container'));
         UI.showToast('Напоминание добавлено');
+    },
+
+    addToGoogleCalendar: function (id) {
+        var reminders = More.getReminders();
+        var r = null;
+        for (var i = 0; i < reminders.length; i++) {
+            if (reminders[i].id === id) { r = reminders[i]; break; }
+        }
+        if (!r) return;
+
+        var title = encodeURIComponent(r.text);
+        var details = encodeURIComponent('Напоминание из приложения «Мой домашний доктор»');
+
+        var dateStr = r.date || new Date().toISOString().split('T')[0];
+        var timeStr = r.time || '09:00';
+        var startDt = dateStr.replace(/-/g, '') + 'T' + timeStr.replace(/:/g, '') + '00';
+
+        var timeParts = timeStr.split(':');
+        var endH = parseInt(timeParts[0], 10) + 1;
+        if (endH > 23) endH = 23;
+        var endTime = (endH < 10 ? '0' : '') + endH + ':' + timeParts[1];
+        var endDt = dateStr.replace(/-/g, '') + 'T' + endTime.replace(/:/g, '') + '00';
+
+        var recur = '';
+        if (r.repeat === 'daily') recur = '&recur=RRULE:FREQ=DAILY';
+        if (r.repeat === 'weekly') recur = '&recur=RRULE:FREQ=WEEKLY';
+
+        var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+            '&text=' + title +
+            '&dates=' + startDt + '/' + endDt +
+            '&details=' + details +
+            recur;
+
+        window.open(url, '_blank');
     },
 
     deleteReminder: function (id) {

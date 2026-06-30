@@ -1143,6 +1143,24 @@ body {
 
 .reminder-info {
     flex: 1;
+    min-width: 0;
+}
+
+.reminder-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.btn-gcal {
+    font-size: 20px;
+    padding: 4px 8px;
+    line-height: 1;
+}
+
+.reminder-info {
+    flex: 1;
 }
 
 .reminder-text {
