@@ -52,6 +52,56 @@ var Doctor = {
         Doctor.renderHistory();
     },
 
+    getAnalysesContext: function () {
+        var analyses = More.getAnalyses();
+        if (analyses.length === 0) return '';
+
+        var lines = ['Результаты анализов и обследований пациента:'];
+        for (var i = 0; i < analyses.length; i++) {
+            var a = analyses[i];
+            var profile = a.profileId ? Storage.getProfileById(a.profileId) : null;
+            var parts = ['— ' + a.name];
+            if (a.date) parts.push('дата: ' + a.date);
+            if (profile) parts.push('пациент: ' + profile.name);
+            lines.push(parts.join(', '));
+            if (a.result) {
+                lines.push('  Результат: ' + a.result);
+            }
+            if (a.files && a.files.length > 0) {
+                var fileNames = [];
+                for (var j = 0; j < a.files.length; j++) {
+                    fileNames.push(a.files[j].name);
+                }
+                lines.push('  Файлы: ' + fileNames.join(', '));
+            }
+        }
+        return lines.join('\n');
+    },
+
+    askAboutAnalysis: function (id) {
+        var analyses = More.getAnalyses();
+        var analysis = null;
+        for (var i = 0; i < analyses.length; i++) {
+            if (analyses[i].id === id) { analysis = analyses[i]; break; }
+        }
+        if (!analysis) return;
+
+        App.navigateTo('doctor');
+
+        var question = 'Расшифруйте, пожалуйста, результаты анализа «' + analysis.name + '»';
+        if (analysis.date) question += ' от ' + analysis.date;
+        question += '.';
+        if (analysis.result) {
+            question += '\n\nРезультаты:\n' + analysis.result;
+        }
+
+        var input = document.getElementById('chat-input');
+        if (input) {
+            input.value = question;
+            input.focus();
+        }
+    },
+
     getProfileContext: function () {
         var profiles = Storage.getProfiles();
         if (profiles.length === 0) return '';
@@ -94,7 +144,8 @@ var Doctor = {
         var body = JSON.stringify({
             message: text,
             history: apiHistory,
-            profileContext: Doctor.getProfileContext()
+            profileContext: Doctor.getProfileContext(),
+            analysesContext: Doctor.getAnalysesContext()
         });
 
         var xhr = new XMLHttpRequest();

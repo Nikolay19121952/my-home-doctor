@@ -78,6 +78,7 @@ app.post('/api/chat', function (req, res) {
     var userMessage = req.body.message;
     var history = req.body.history || [];
     var profileContext = req.body.profileContext || '';
+    var analysesContext = req.body.analysesContext || '';
 
     if (!userMessage) {
         return res.status(400).json({ error: 'Сообщение не может быть пустым' });
@@ -86,6 +87,9 @@ app.post('/api/chat', function (req, res) {
     var systemContent = SYSTEM_PROMPT;
     if (profileContext) {
         systemContent += '\n\nИнформация о пациенте (из медицинской карты):\n' + profileContext;
+    }
+    if (analysesContext) {
+        systemContent += '\n\n' + analysesContext;
     }
 
     var messages = [];

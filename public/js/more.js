@@ -201,6 +201,7 @@ var More = {
                     (a.result ? '<div class="analysis-result">' + UI.escapeHtml(a.result).replace(/\n/g, '<br>') + '</div>' : '') +
                     More.renderAnalysisFiles(a.files) +
                     '<button class="btn btn-outline btn-full" style="margin-top:12px;" onclick="More.editAnalysis(\'' + a.id + '\')">✏️ Редактировать</button>' +
+                    '<button class="btn btn-outline btn-full" style="margin-top:8px;" onclick="Doctor.askAboutAnalysis(\'' + a.id + '\')">🩺 Спросить доктора</button>' +
                     '</div>';
             }
         }
