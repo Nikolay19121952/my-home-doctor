@@ -277,7 +277,12 @@
                     <button id="btn-clear-chat" class="btn btn-outline btn-small">Очистить</button>
                 </div>
                 <div id="chat-messages" class="chat-messages"></div>
+                <div id="chat-drop-files" class="chat-drop-files" style="display:none"></div>
                 <div class="chat-input-area">
+                    <label class="btn-attach" title="Прикрепить файл">
+                        📎
+                        <input type="file" id="chat-file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp" style="display:none">
+                    </label>
                     <textarea id="chat-input" class="chat-input" rows="1" placeholder="Напишите, что вас беспокоит..."></textarea>
                     <button id="btn-send-message" class="btn btn-primary btn-send">
                         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">

@@ -3,10 +3,14 @@ var Doctor = {
     isLoading: false,
     _pendingFiles: null,
 
+    _droppedFiles: [],
+
     init: function () {
         var sendBtn = document.getElementById('btn-send-message');
         var input = document.getElementById('chat-input');
         var clearBtn = document.getElementById('btn-clear-chat');
+        var chatArea = document.getElementById('chat-messages');
+        var fileInput = document.getElementById('chat-file-input');
 
         sendBtn.addEventListener('click', function () {
             Doctor.sendMessage();
@@ -31,6 +35,28 @@ var Doctor = {
             );
         });
 
+        chatArea.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            chatArea.classList.add('chat-dragover');
+        });
+        chatArea.addEventListener('dragleave', function () {
+            chatArea.classList.remove('chat-dragover');
+        });
+        chatArea.addEventListener('drop', function (e) {
+            e.preventDefault();
+            chatArea.classList.remove('chat-dragover');
+            if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+                Doctor.addFiles(e.dataTransfer.files);
+            }
+        });
+
+        fileInput.addEventListener('change', function () {
+            if (fileInput.files.length > 0) {
+                Doctor.addFiles(fileInput.files);
+                fileInput.value = '';
+            }
+        });
+
         Doctor.renderHistory();
     },
 
@@ -51,6 +77,58 @@ var Doctor = {
     clearHistory: function () {
         localStorage.removeItem(Doctor.HISTORY_KEY);
         Doctor.renderHistory();
+    },
+
+    addFiles: function (fileList) {
+        var allowed = ['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+        var added = 0;
+        for (var i = 0; i < fileList.length; i++) {
+            var file = fileList[i];
+            if (allowed.indexOf(file.type) === -1) continue;
+            (function (f) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    var dataUrl = e.target.result;
+                    var commaIdx = dataUrl.indexOf(',');
+                    var header = dataUrl.substring(0, commaIdx);
+                    var base64 = dataUrl.substring(commaIdx + 1);
+                    var mediaType = 'application/pdf';
+                    var mtMatch = header.match(/data:([^;]+)/);
+                    if (mtMatch) mediaType = mtMatch[1];
+                    Doctor._droppedFiles.push({ name: f.name, mediaType: mediaType, data: base64 });
+                    Doctor.renderDropFiles();
+                };
+                reader.readAsDataURL(f);
+            })(file);
+            added++;
+        }
+        if (added === 0) {
+            UI.showToast('Поддерживаются файлы: PDF, PNG, JPG, GIF, WebP');
+        }
+    },
+
+    removeDropFile: function (index) {
+        Doctor._droppedFiles.splice(index, 1);
+        Doctor.renderDropFiles();
+    },
+
+    renderDropFiles: function () {
+        var container = document.getElementById('chat-drop-files');
+        if (!container) return;
+        if (Doctor._droppedFiles.length === 0) {
+            container.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+        container.style.display = 'flex';
+        var html = '';
+        for (var i = 0; i < Doctor._droppedFiles.length; i++) {
+            var f = Doctor._droppedFiles[i];
+            var icon = f.mediaType.indexOf('image/') === 0 ? '🖼️' : '📄';
+            html += '<div class="chat-drop-file">' + icon + ' <span>' + UI.escapeHtml(f.name) + '</span>' +
+                '<button onclick="Doctor.removeDropFile(' + i + ')" title="Удалить">✕</button></div>';
+        }
+        container.innerHTML = html;
     },
 
     getAnalysesContext: function () {
@@ -166,6 +244,11 @@ var Doctor = {
 
         var files = Doctor._pendingFiles || [];
         Doctor._pendingFiles = null;
+        for (var d = 0; d < Doctor._droppedFiles.length; d++) {
+            files.push(Doctor._droppedFiles[d]);
+        }
+        Doctor._droppedFiles = [];
+        Doctor.renderDropFiles();
 
         var body = JSON.stringify({
             message: text,

@@ -263,6 +263,67 @@ body {
     font-size: 14px;
 }
 
+.btn-attach {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+
+.btn-attach:hover {
+    background: var(--color-primary-light);
+}
+
+.chat-drop-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--color-primary-light);
+    border-radius: 8px;
+    margin: 0 8px;
+}
+
+.chat-drop-file {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 13px;
+    max-width: 200px;
+}
+
+.chat-drop-file span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-drop-file button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-danger);
+    font-size: 16px;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+.chat-dragover {
+    outline: 3px dashed var(--color-primary);
+    outline-offset: -3px;
+    background: var(--color-primary-light) !important;
+}
+
 .btn-back {
     flex-shrink: 0;
 }
