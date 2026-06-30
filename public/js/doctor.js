@@ -1,6 +1,7 @@
 var Doctor = {
     HISTORY_KEY: 'mdd_chat_history',
     isLoading: false,
+    _pendingFiles: null,
 
     init: function () {
         var sendBtn = document.getElementById('btn-send-message');
@@ -88,11 +89,33 @@ var Doctor = {
 
         App.navigateTo('doctor');
 
+        var pdfFiles = [];
+        if (analysis.files && analysis.files.length > 0) {
+            for (var j = 0; j < analysis.files.length; j++) {
+                var f = analysis.files[j];
+                if (f.data && f.data.indexOf('data:') === 0) {
+                    var commaIdx = f.data.indexOf(',');
+                    if (commaIdx > -1) {
+                        var header = f.data.substring(0, commaIdx);
+                        var base64 = f.data.substring(commaIdx + 1);
+                        var mediaType = 'application/pdf';
+                        var mtMatch = header.match(/data:([^;]+)/);
+                        if (mtMatch) mediaType = mtMatch[1];
+                        pdfFiles.push({ name: f.name, mediaType: mediaType, data: base64 });
+                    }
+                }
+            }
+        }
+        Doctor._pendingFiles = pdfFiles.length > 0 ? pdfFiles : null;
+
         var question = 'Расшифруйте, пожалуйста, результаты анализа «' + analysis.name + '»';
         if (analysis.date) question += ' от ' + analysis.date;
         question += '.';
         if (analysis.result) {
             question += '\n\nРезультаты:\n' + analysis.result;
+        }
+        if (pdfFiles.length > 0) {
+            question += '\n\nК сообщению прикреплено ' + pdfFiles.length + ' файл(ов) с результатами анализов. Расшифруйте каждый из них.';
         }
 
         var input = document.getElementById('chat-input');
@@ -141,11 +164,15 @@ var Doctor = {
             apiHistory.push({ role: history[i].role, content: history[i].content });
         }
 
+        var files = Doctor._pendingFiles || [];
+        Doctor._pendingFiles = null;
+
         var body = JSON.stringify({
             message: text,
             history: apiHistory,
             profileContext: Doctor.getProfileContext(),
-            analysesContext: Doctor.getAnalysesContext()
+            analysesContext: Doctor.getAnalysesContext(),
+            files: files
         });
 
         var xhr = new XMLHttpRequest();

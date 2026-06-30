@@ -6,7 +6,7 @@ var app = express();
 var PORT = process.env.PORT || 3000;
 var API_KEY = process.env.ANTHROPIC_API_KEY || '';
 
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 var SYSTEM_PROMPT = [
@@ -79,6 +79,7 @@ app.post('/api/chat', function (req, res) {
     var history = req.body.history || [];
     var profileContext = req.body.profileContext || '';
     var analysesContext = req.body.analysesContext || '';
+    var files = req.body.files || [];
 
     if (!userMessage) {
         return res.status(400).json({ error: 'Сообщение не может быть пустым' });
@@ -99,11 +100,36 @@ app.post('/api/chat', function (req, res) {
             content: history[i].content
         });
     }
-    messages.push({ role: 'user', content: userMessage });
+
+    var userContent;
+    if (files.length > 0) {
+        userContent = [];
+        for (var f = 0; f < files.length; f++) {
+            var file = files[f];
+            var isImage = file.mediaType && file.mediaType.indexOf('image/') === 0;
+            if (isImage) {
+                userContent.push({
+                    type: 'image',
+                    source: { type: 'base64', media_type: file.mediaType, data: file.data }
+                });
+            } else {
+                userContent.push({
+                    type: 'document',
+                    source: { type: 'base64', media_type: file.mediaType || 'application/pdf', data: file.data }
+                });
+            }
+        }
+        userContent.push({ type: 'text', text: userMessage });
+    } else {
+        userContent = userMessage;
+    }
+    messages.push({ role: 'user', content: userContent });
+
+    var maxTokens = files.length > 0 ? 4096 : 1024;
 
     var requestBody = JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
+        max_tokens: maxTokens,
         system: systemContent,
         messages: messages
     });
