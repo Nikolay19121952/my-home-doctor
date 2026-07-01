@@ -16,6 +16,8 @@ var More = {
             More.renderAnalyses(container);
         } else if (section === 'settings') {
             More.renderSettings(container);
+        } else if (section === 'about') {
+            More.renderAbout(container);
         }
     },
 
@@ -37,6 +39,10 @@ var More = {
             '<button class="more-item" onclick="More.showSection(\'settings\')">' +
             '<span class="more-icon">⚙️</span>' +
             '<div class="more-text"><span class="more-label">Настройки</span><span class="more-desc">Экспорт и импорт данных</span></div>' +
+            '</button>' +
+            '<button class="more-item" onclick="More.showSection(\'about\')">' +
+            '<span class="more-icon">ℹ️</span>' +
+            '<div class="more-text"><span class="more-label">О приложении</span><span class="more-desc">Описание, инструкция, обратная связь</span></div>' +
             '</button>' +
             '</div>';
     },
@@ -551,5 +557,71 @@ var More = {
                 More.renderSettings(document.querySelector('#more .container'));
             }
         );
+    },
+
+    // ===== О ПРИЛОЖЕНИИ =====
+
+    renderAbout: function (container) {
+        var html = '<div class="section-header">' +
+            '<button class="btn btn-outline btn-back" onclick="More.showMenu()">← Назад</button>' +
+            '<h2>О приложении</h2>' +
+            '</div>';
+
+        html += '<div class="about-section">' +
+            '<div class="about-logo">🩺</div>' +
+            '<h3>Мой домашний доктор</h3>' +
+            '<p class="about-version">Версия 1.0</p>' +
+            '</div>';
+
+        html += '<div class="about-card">' +
+            '<h3>📋 Что это за приложение?</h3>' +
+            '<p>«Мой домашний доктор» — это персональный медицинский помощник для вас и вашей семьи. ' +
+            'Приложение помогает следить за здоровьем, хранить результаты анализов и получать ' +
+            'консультации от ИИ-доктора на основе технологии Claude от Anthropic.</p>' +
+            '</div>';
+
+        html += '<div class="about-card">' +
+            '<h3>📖 Как пользоваться</h3>' +
+            '<div class="about-instructions">' +
+            '<div class="about-step"><span class="about-step-icon">🏠</span>' +
+            '<div><strong>Главная</strong> — общая информация и быстрый доступ к основным функциям.</div></div>' +
+            '<div class="about-step"><span class="about-step-icon">👨‍👩‍👧‍👦</span>' +
+            '<div><strong>Семья</strong> — создайте профили членов семьи с указанием возраста, ' +
+            'хронических заболеваний и принимаемых лекарств. Доктор учтёт эту информацию при консультации.</div></div>' +
+            '<div class="about-step"><span class="about-step-icon">📋</span>' +
+            '<div><strong>Дневник</strong> — ведите ежедневные записи о самочувствии, давлении, ' +
+            'температуре и других показателях здоровья.</div></div>' +
+            '<div class="about-step"><span class="about-step-icon">🩺</span>' +
+            '<div><strong>Доктор</strong> — чат с ИИ-доктором. Опишите симптомы, прикрепите файлы анализов ' +
+            '(PDF, фото) через кнопку 📎 или перетащите их в чат. Доктор расшифрует результаты и даст рекомендации. ' +
+            'Ответы можно распечатать кнопкой 🖨️ Печать.</div></div>' +
+            '<div class="about-step"><span class="about-step-icon">📄</span>' +
+            '<div><strong>Анализы</strong> — храните результаты обследований с прикреплёнными PDF-файлами. ' +
+            'Кнопка «Спросить доктора» отправит файлы на расшифровку.</div></div>' +
+            '<div class="about-step"><span class="about-step-icon">🔔</span>' +
+            '<div><strong>Напоминания</strong> — создавайте напоминания о приёме лекарств и визитах к врачу. ' +
+            'Кнопка 📅 добавит событие в Google Календарь.</div></div>' +
+            '</div></div>';
+
+        html += '<div class="about-card">' +
+            '<h3>⚠️ Важно</h3>' +
+            '<p>Приложение предоставляет справочную информацию и <strong>не заменяет визит к врачу</strong>. ' +
+            'Для постановки диагноза и назначения лечения обязательно обратитесь к квалифицированному специалисту.</p>' +
+            '</div>';
+
+        html += '<div class="about-card">' +
+            '<h3>💬 Обратная связь</h3>' +
+            '<p>Ваши отзывы, замечания и предложения помогут сделать приложение лучше!</p>' +
+            '<p>Свяжитесь с разработчиком:</p>' +
+            '<a href="https://m.vk.com/Nick_l2591" target="_blank" class="btn btn-primary btn-full" ' +
+            'style="margin-top:8px;text-decoration:none;text-align:center;">📨 Написать ВКонтакте</a>' +
+            '</div>';
+
+        html += '<div class="about-footer">' +
+            '<p>Разработано в рамках курса «Оператор Claude»</p>' +
+            '<p>© 2026 Николай Дмитриевич</p>' +
+            '</div>';
+
+        container.innerHTML = html;
     }
 };
