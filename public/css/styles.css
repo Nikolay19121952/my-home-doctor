@@ -397,6 +397,21 @@ body {
     margin: 4px 0;
 }
 
+.diary-entry-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.diary-entry-actions .btn {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    padding: 6px 4px;
+    white-space: nowrap;
+}
+
 .btn-back {
     flex-shrink: 0;
 }

@@ -105,15 +105,28 @@ var Diary = {
         };
 
         var entries = Diary.getEntries();
-        entries.unshift(entry);
-        if (entries.length > 200) {
-            entries = entries.slice(0, 200);
+        var wasEditing = !!Diary._editingId;
+        if (Diary._editingId) {
+            for (var k = 0; k < entries.length; k++) {
+                if (entries[k].id === Diary._editingId) {
+                    entry.id = Diary._editingId;
+                    entry.createdAt = entries[k].createdAt;
+                    entries[k] = entry;
+                    break;
+                }
+            }
+            Diary._editingId = null;
+        } else {
+            entries.unshift(entry);
+            if (entries.length > 200) {
+                entries = entries.slice(0, 200);
+            }
         }
         Diary.saveEntries(entries);
 
         Diary.hideForm();
         Diary.renderEntries();
-        UI.showToast('Запись добавлена');
+        UI.showToast(wasEditing ? 'Запись обновлена' : 'Запись добавлена');
     },
 
     updateProfileSelect: function () {
@@ -195,6 +208,11 @@ var Diary = {
             if (e.notes) {
                 html += '<div class="diary-entry-notes">' + UI.escapeHtml(e.notes) + '</div>';
             }
+            html += '<div class="diary-entry-actions">' +
+                '<button class="btn btn-outline btn-small" onclick="Diary.editEntry(\'' + e.id + '\')">✏️ Редакт.</button>' +
+                '<button class="btn btn-outline btn-small" onclick="Diary.askDoctor(\'' + e.id + '\')">🩺 Доктору</button>' +
+                '<button class="btn btn-outline btn-small" onclick="Diary.saveToFile(\'' + e.id + '\')">💾 Файл</button>' +
+                '</div>';
             html += '</div>';
         }
 
@@ -226,5 +244,108 @@ var Diary = {
         var parts = dateStr.split('-');
         if (parts.length !== 3) return dateStr;
         return parts[2] + '.' + parts[1] + '.' + parts[0];
+    },
+
+    _editingId: null,
+
+    editEntry: function (id) {
+        var entries = Diary.getEntries();
+        var entry = null;
+        for (var i = 0; i < entries.length; i++) {
+            if (entries[i].id === id) { entry = entries[i]; break; }
+        }
+        if (!entry) return;
+
+        Diary._editingId = id;
+        Diary.showForm();
+        document.getElementById('entry-date').value = entry.date || '';
+        document.getElementById('entry-time').value = entry.time || '';
+        document.getElementById('entry-systolic').value = entry.systolic || '';
+        document.getElementById('entry-diastolic').value = entry.diastolic || '';
+        document.getElementById('entry-pulse').value = entry.pulse || '';
+        document.getElementById('entry-sugar').value = entry.sugar || '';
+        document.getElementById('entry-temp').value = entry.temperature || '';
+        document.getElementById('entry-weight').value = entry.weight || '';
+        document.getElementById('entry-notes').value = entry.notes || '';
+    },
+
+    _formatEntryText: function (e) {
+        var profile = e.profileId ? Storage.getProfileById(e.profileId) : null;
+        var lines = [];
+        lines.push('Дата: ' + Diary.formatDate(e.date) + ' ' + (e.time || ''));
+        if (profile) lines.push('Пациент: ' + profile.name);
+        if (e.systolic && e.diastolic) lines.push('Давление: ' + e.systolic + '/' + e.diastolic + ' мм рт.ст.');
+        if (e.pulse) lines.push('Пульс: ' + e.pulse + ' уд/мин');
+        if (e.sugar) lines.push('Сахар крови: ' + e.sugar + ' ммоль/л');
+        if (e.temperature) lines.push('Температура: ' + e.temperature + '°C');
+        if (e.weight) lines.push('Вес: ' + e.weight + ' кг');
+        if (e.notes) lines.push('Заметки: ' + e.notes);
+        return lines.join('\n');
+    },
+
+    askDoctor: function (id) {
+        var entries = Diary.getEntries();
+        var entry = null;
+        for (var i = 0; i < entries.length; i++) {
+            if (entries[i].id === id) { entry = entries[i]; break; }
+        }
+        if (!entry) return;
+
+        App.navigateTo('doctor');
+        var text = 'Проанализируйте мои показатели здоровья:\n\n' + Diary._formatEntryText(entry);
+        var input = document.getElementById('chat-input');
+        if (input) {
+            input.value = text;
+            input.focus();
+        }
+    },
+
+    saveToFile: function (id) {
+        var entries = Diary.getEntries();
+        var entry = null;
+        for (var i = 0; i < entries.length; i++) {
+            if (entries[i].id === id) { entry = entries[i]; break; }
+        }
+        if (!entry) return;
+
+        var profile = entry.profileId ? Storage.getProfileById(entry.profileId) : null;
+        var date = new Date().toLocaleDateString('ru-RU');
+
+        var body = '<h2>Запись дневника здоровья</h2>';
+        body += '<p><strong>Дата измерения:</strong> ' + UI.escapeHtml(Diary.formatDate(entry.date)) + ' ' + UI.escapeHtml(entry.time || '') + '</p>';
+        if (profile) body += '<p><strong>Пациент:</strong> ' + UI.escapeHtml(profile.name) + '</p>';
+        body += '<hr><table>';
+        if (entry.systolic && entry.diastolic) body += '<tr><td><strong>Артериальное давление</strong></td><td>' + entry.systolic + '/' + entry.diastolic + ' мм рт.ст.</td></tr>';
+        if (entry.pulse) body += '<tr><td><strong>Пульс</strong></td><td>' + entry.pulse + ' уд/мин</td></tr>';
+        if (entry.sugar) body += '<tr><td><strong>Сахар крови</strong></td><td>' + entry.sugar + ' ммоль/л</td></tr>';
+        if (entry.temperature) body += '<tr><td><strong>Температура</strong></td><td>' + entry.temperature + '°C</td></tr>';
+        if (entry.weight) body += '<tr><td><strong>Вес</strong></td><td>' + entry.weight + ' кг</td></tr>';
+        body += '</table>';
+        if (entry.notes) body += '<hr><h3>Заметки</h3><p>' + UI.escapeHtml(entry.notes).replace(/\n/g, '<br>') + '</p>';
+
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+            '<title>Дневник здоровья — ' + UI.escapeHtml(Diary.formatDate(entry.date)) + '</title>' +
+            '<style>' +
+            'body{font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:30px;color:#222;font-size:14px;line-height:1.6}' +
+            '.header{text-align:center;border-bottom:2px solid #2563eb;padding-bottom:16px;margin-bottom:24px}' +
+            '.header h1{color:#2563eb;margin:0;font-size:22px}' +
+            '.header p{margin:4px 0;color:#666;font-size:13px}' +
+            'h2{color:#2563eb;font-size:18px}h3{color:#1e40af;font-size:15px}' +
+            'table{width:100%;border-collapse:collapse;margin:12px 0}' +
+            'td{border:1px solid #ccc;padding:8px 12px;font-size:14px}' +
+            'tr td:first-child{background:#e8f0fe;width:45%;font-weight:bold}' +
+            'hr{border:none;border-top:1px solid #ddd;margin:16px 0}' +
+            '.footer{text-align:center;margin-top:30px;padding-top:16px;border-top:1px solid #ddd;color:#999;font-size:11px}' +
+            '@media print{body{padding:15px}}' +
+            '</style></head><body>' +
+            '<div class="header"><h1>🩺 Мой домашний доктор</h1><p>Дневник здоровья · ' + date + '</p></div>' +
+            body +
+            '<div class="footer">Документ сформирован приложением «Мой домашний доктор»</div>' +
+            '</body></html>';
+
+        var w = window.open('', '_blank');
+        w.document.write(html);
+        w.document.close();
+        w.print();
     }
 };
