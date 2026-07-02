@@ -257,9 +257,14 @@ body {
     width: 100%;
 }
 
-.btn-print {
+.chat-bubble-actions {
+    display: flex;
+    gap: 8px;
     margin-top: 10px;
-    width: 100%;
+}
+
+.btn-print {
+    flex: 1;
     font-size: 14px;
 }
 
@@ -410,6 +415,33 @@ body {
     font-size: 13px;
     padding: 6px 4px;
     white-space: nowrap;
+}
+
+.diary-batch-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #e8f0fe;
+    padding: 10px 16px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e40af;
+}
+
+.diary-checkbox {
+    display: flex;
+    align-items: center;
+    margin-right: 8px;
+    cursor: pointer;
+}
+
+.diary-checkbox input {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: #2563eb;
 }
 
 .btn-back {

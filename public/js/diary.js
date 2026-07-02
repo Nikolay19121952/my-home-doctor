@@ -1,6 +1,7 @@
 var Diary = {
     DIARY_KEY: 'mdd_diary',
     currentProfile: null,
+    _selectedIds: [],
 
     init: function () {
         var addBtn = document.getElementById('btn-add-entry');
@@ -170,14 +171,20 @@ var Diary = {
             return;
         }
 
-        var html = '';
+        var html = '<div class="diary-batch-bar" id="diary-batch-bar" style="display:none;">' +
+            '<span id="diary-batch-count">Выбрано: 0</span>' +
+            '<button class="btn btn-primary btn-small" onclick="Diary.askDoctorBatch()">🩺 Отправить доктору</button>' +
+            '</div>';
         for (var i = 0; i < entries.length; i++) {
             var e = entries[i];
             var profile = e.profileId ? Storage.getProfileById(e.profileId) : null;
             var profileName = profile ? profile.name : '';
+            var checked = Diary._selectedIds.indexOf(e.id) !== -1;
 
             html += '<div class="diary-entry">';
             html += '<div class="diary-entry-header">';
+            html += '<label class="diary-checkbox"><input type="checkbox" ' + (checked ? 'checked' : '') +
+                ' onchange="Diary.toggleSelect(\'' + e.id + '\', this.checked)"><span class="checkmark"></span></label>';
             html += '<span class="diary-entry-date">' + UI.escapeHtml(Diary.formatDate(e.date)) + ' ' + UI.escapeHtml(e.time || '') + '</span>';
             if (profileName) {
                 html += '<span class="diary-entry-profile">' + UI.escapeHtml(profileName) + '</span>';
@@ -283,6 +290,55 @@ var Diary = {
         return lines.join('\n');
     },
 
+    toggleSelect: function (id, checked) {
+        if (checked) {
+            if (Diary._selectedIds.indexOf(id) === -1) Diary._selectedIds.push(id);
+        } else {
+            Diary._selectedIds = Diary._selectedIds.filter(function (x) { return x !== id; });
+        }
+        var bar = document.getElementById('diary-batch-bar');
+        var count = document.getElementById('diary-batch-count');
+        if (bar) bar.style.display = Diary._selectedIds.length > 0 ? 'flex' : 'none';
+        if (count) count.textContent = 'Выбрано: ' + Diary._selectedIds.length;
+    },
+
+    _formatEntryShort: function (e) {
+        var parts = [Diary.formatDate(e.date) + ' ' + (e.time || '')];
+        if (e.systolic && e.diastolic) parts.push('АД ' + e.systolic + '/' + e.diastolic);
+        if (e.pulse) parts.push('пульс ' + e.pulse);
+        if (e.sugar) parts.push('сахар ' + e.sugar);
+        if (e.temperature) parts.push('t° ' + e.temperature);
+        if (e.weight) parts.push('вес ' + e.weight);
+        if (e.notes) parts.push('(' + e.notes + ')');
+        return parts.join(' | ');
+    },
+
+    askDoctorBatch: function () {
+        if (Diary._selectedIds.length === 0) return;
+        var entries = Diary.getEntries();
+        var selected = [];
+        for (var i = 0; i < entries.length; i++) {
+            if (Diary._selectedIds.indexOf(entries[i].id) !== -1) selected.push(entries[i]);
+        }
+        selected.sort(function (a, b) { return (a.date + a.time) < (b.date + b.time) ? -1 : 1; });
+
+        var profile = selected[0].profileId ? Storage.getProfileById(selected[0].profileId) : null;
+        var text = 'Проанализируйте динамику показателей здоровья';
+        if (profile) text += ' пациента ' + profile.name;
+        text += ' (' + selected.length + ' измерений):\n\n';
+        for (var j = 0; j < selected.length; j++) {
+            text += Diary._formatEntryShort(selected[j]) + '\n';
+        }
+
+        Diary._selectedIds = [];
+        App.navigateTo('doctor');
+        var input = document.getElementById('chat-input');
+        if (input) {
+            input.value = text;
+            input.focus();
+        }
+    },
+
     askDoctor: function (id) {
         var entries = Diary.getEntries();
         var entry = null;
@@ -343,9 +399,15 @@ var Diary = {
             '<div class="footer">Документ сформирован приложением «Мой домашний доктор»</div>' +
             '</body></html>';
 
-        var w = window.open('', '_blank');
-        w.document.write(html);
-        w.document.close();
-        w.print();
+        var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'diary_' + (entry.date || 'entry') + '.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        UI.showToast('Файл сохранён');
     }
 };

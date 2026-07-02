@@ -668,8 +668,9 @@ var More = {
             '<h3>💬 Обратная связь</h3>' +
             '<p>Ваши отзывы, замечания и предложения помогут сделать приложение лучше!</p>' +
             '<p>Свяжитесь с разработчиком:</p>' +
-            '<a href="https://m.vk.com/Nick_l2591" target="_blank" class="btn btn-primary btn-full" ' +
-            'style="margin-top:8px;text-decoration:none;text-align:center;">📨 Написать ВКонтакте</a>' +
+            '<p style="margin-top:8px;">Написать в мессенджер ВКонтакте по адресу: ' +
+            '<a href="https://m.vk.com/Nick_l2591" target="_blank" style="color:#2563eb;font-weight:bold;">@Nick_l2591</a></p>' +
+            '<p>или по E-mail: <a href="mailto:vonoiral2591@gmail.com" style="color:#2563eb;font-weight:bold;">vonoiral2591@gmail.com</a></p>' +
             '</div>';
 
         html += '<div class="about-footer">' +
