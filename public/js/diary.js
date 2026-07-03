@@ -341,55 +341,14 @@ var Diary = {
 
     saveToFileBatch: function () {
         if (Diary._selectedIds.length === 0) return;
-        var entries = Diary.getEntries();
-        var selected = [];
-        for (var i = 0; i < entries.length; i++) {
-            if (Diary._selectedIds.indexOf(entries[i].id) !== -1) selected.push(entries[i]);
+        var ids = Diary._selectedIds.slice();
+        var total = ids.length;
+        for (var i = 0; i < ids.length; i++) {
+            (function (id, delay) {
+                setTimeout(function () { Diary.saveToFile(id); }, delay);
+            })(ids[i], i * 1500);
         }
-        selected.sort(function (a, b) { return (a.date + a.time) < (b.date + b.time) ? -1 : 1; });
-
-        var profile = selected[0].profileId ? Storage.getProfileById(selected[0].profileId) : null;
-        var date = new Date().toLocaleDateString('ru-RU');
-
-        var body = '<h2>Дневник здоровья</h2>';
-        if (profile) body += '<p><strong>Пациент:</strong> ' + UI.escapeHtml(profile.name) + '</p>';
-        body += '<p><strong>Записей:</strong> ' + selected.length + '</p><hr>';
-
-        for (var j = 0; j < selected.length; j++) {
-            var e = selected[j];
-            body += '<h3>' + UI.escapeHtml(Diary.formatDate(e.date)) + ' ' + UI.escapeHtml(e.time || '') + '</h3>';
-            body += '<table>';
-            if (e.systolic && e.diastolic) body += '<tr><td><strong>Артериальное давление</strong></td><td>' + e.systolic + '/' + e.diastolic + ' мм рт.ст.</td></tr>';
-            if (e.pulse) body += '<tr><td><strong>Пульс</strong></td><td>' + e.pulse + ' уд/мин</td></tr>';
-            if (e.sugar) body += '<tr><td><strong>Сахар крови</strong></td><td>' + e.sugar + ' ммоль/л</td></tr>';
-            if (e.temperature) body += '<tr><td><strong>Температура</strong></td><td>' + e.temperature + '°C</td></tr>';
-            if (e.weight) body += '<tr><td><strong>Вес</strong></td><td>' + e.weight + ' кг</td></tr>';
-            body += '</table>';
-            if (e.notes) body += '<p><em>' + UI.escapeHtml(e.notes) + '</em></p>';
-            if (j < selected.length - 1) body += '<hr>';
-        }
-
-        var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-            '<title>Дневник здоровья — ' + selected.length + ' записей</title>' +
-            '<style>' +
-            'body{font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:30px;color:#222;font-size:14px;line-height:1.6}' +
-            '.header{text-align:center;border-bottom:2px solid #2563eb;padding-bottom:16px;margin-bottom:24px}' +
-            '.header h1{color:#2563eb;margin:0;font-size:22px}' +
-            '.header p{margin:4px 0;color:#666;font-size:13px}' +
-            'h2{color:#2563eb;font-size:18px}h3{color:#1e40af;font-size:15px;margin-top:20px}' +
-            'table{width:100%;border-collapse:collapse;margin:8px 0}' +
-            'td{border:1px solid #ccc;padding:8px 12px;font-size:14px}' +
-            'tr td:first-child{background:#e8f0fe;width:45%;font-weight:bold}' +
-            'hr{border:none;border-top:1px solid #ddd;margin:16px 0}' +
-            '.footer{text-align:center;margin-top:30px;padding-top:16px;border-top:1px solid #ddd;color:#999;font-size:11px}' +
-            '@media print{body{padding:15px}}' +
-            '</style></head><body>' +
-            '<div class="header"><h1>🩺 Мой домашний доктор</h1><p>Дневник здоровья · ' + date + '</p></div>' +
-            body +
-            '<div class="footer">Документ сформирован приложением «Мой домашний доктор»</div>' +
-            '</body></html>';
-
-        UI.savePDF(html, 'diary_batch_' + selected.length + '_entries.pdf');
+        UI.showToast('Сохранение ' + total + ' файлов PDF...');
     },
 
     askDoctor: function (id) {

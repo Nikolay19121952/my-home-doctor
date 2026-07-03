@@ -100,11 +100,19 @@ const UI = {
 
     savePDF: function (htmlContent, filename) {
         var container = document.createElement('div');
-        container.innerHTML = htmlContent;
         container.style.position = 'absolute';
         container.style.left = '-9999px';
         container.style.top = '0';
         container.style.width = '700px';
+
+        var styleMatch = htmlContent.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+        var bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+
+        var inner = '';
+        if (styleMatch) inner += '<style>' + styleMatch[1] + '</style>';
+        inner += bodyMatch ? bodyMatch[1] : htmlContent;
+        container.innerHTML = inner;
+
         document.body.appendChild(container);
 
         var opt = {
