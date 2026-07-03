@@ -116,7 +116,7 @@ const UI = {
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
-        html2pdf().set(opt).from(fullHtml, 'string').save().then(function () {
+        return html2pdf().set(opt).from(fullHtml, 'string').save().then(function () {
             UI.showToast('PDF сохранён');
         }).catch(function () {
             UI.showToast('Ошибка сохранения PDF');

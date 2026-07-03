@@ -343,12 +343,20 @@ var Diary = {
         if (Diary._selectedIds.length === 0) return;
         var ids = Diary._selectedIds.slice();
         var total = ids.length;
-        for (var i = 0; i < ids.length; i++) {
-            (function (id, delay) {
-                setTimeout(function () { Diary.saveToFile(id); }, delay);
-            })(ids[i], i * 1500);
-        }
+        var saved = 0;
         UI.showToast('Сохранение ' + total + ' файлов PDF...');
+
+        function saveNext() {
+            if (saved >= ids.length) {
+                UI.showToast('Сохранено ' + total + ' файлов PDF');
+                return;
+            }
+            Diary.saveToFile(ids[saved]).then(function () {
+                saved++;
+                saveNext();
+            });
+        }
+        saveNext();
     },
 
     askDoctor: function (id) {
@@ -411,6 +419,6 @@ var Diary = {
             '<div class="footer">Документ сформирован приложением «Мой домашний доктор»</div>' +
             '</body></html>';
 
-        UI.savePDF(html, 'diary_' + (entry.date || 'entry') + '.pdf');
+        return UI.savePDF(html, 'diary_' + (entry.date || 'entry') + '.pdf');
     }
 };

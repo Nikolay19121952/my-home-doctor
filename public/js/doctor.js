@@ -459,7 +459,7 @@ var Doctor = {
             '<div class="footer">Данный отчёт носит справочный характер и не является медицинским заключением.</div>' +
             '</body></html>';
 
-        UI.savePDF(html, 'doctor_report_' + dateFile + '.pdf');
+        return UI.savePDF(html, 'doctor_report_' + dateFile + '.pdf');
     },
 
     showTyping: function () {

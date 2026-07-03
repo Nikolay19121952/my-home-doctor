@@ -512,7 +512,7 @@ var More = {
             '<div class="footer">Документ сформирован приложением «Мой домашний доктор»</div>' +
             '</body></html>';
 
-        UI.savePDF(html, 'analysis_' + (a.date || 'report') + '.pdf');
+        return UI.savePDF(html, 'analysis_' + (a.date || 'report') + '.pdf');
     },
 
     // ===== НАСТРОЙКИ (экспорт/импорт) =====
