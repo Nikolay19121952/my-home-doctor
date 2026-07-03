@@ -219,7 +219,6 @@ var Diary = {
             }
             html += '<div class="diary-entry-actions">' +
                 '<button class="btn btn-outline btn-small" onclick="Diary.editEntry(\'' + e.id + '\')">✏️ Редакт.</button>' +
-                '<button class="btn btn-outline btn-small" onclick="Diary.saveToFile(\'' + e.id + '\')">💾 Файл</button>' +
                 '</div>';
             html += '</div>';
         }
