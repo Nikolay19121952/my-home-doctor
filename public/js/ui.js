@@ -101,37 +101,24 @@ const UI = {
     savePDF: function (htmlContent, filename) {
         var styleMatch = htmlContent.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
         var bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-
-        var css = styleMatch ? styleMatch[1].replace(/body\s*\{/g, '.pdf-page{') : '';
+        var css = styleMatch ? styleMatch[1] : '';
         var bodyHtml = bodyMatch ? bodyMatch[1] : htmlContent;
 
-        var container = document.createElement('div');
-        container.className = 'pdf-page';
-        container.style.width = '700px';
-        container.style.background = 'white';
-        container.style.fontFamily = 'Arial, sans-serif';
-        container.style.fontSize = '14px';
-        container.style.lineHeight = '1.6';
-        container.style.color = '#222';
-        container.style.padding = '30px';
-        container.style.boxSizing = 'border-box';
-
-        container.innerHTML = '<style>' + css + '</style>' + bodyHtml;
-        document.body.appendChild(container);
+        var fullHtml = '<div style="width:640px;padding:30px;font-family:Arial,sans-serif;' +
+            'font-size:14px;line-height:1.6;color:#222;background:white;">' +
+            '<style>' + css + '</style>' + bodyHtml + '</div>';
 
         var opt = {
             margin: [10, 10, 10, 10],
             filename: filename,
             image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { scale: 2, useCORS: true, scrollY: 0, windowWidth: container.scrollWidth },
+            html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, x: 0, y: 0, windowWidth: 700 },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
-        html2pdf().set(opt).from(container).save().then(function () {
-            document.body.removeChild(container);
+        html2pdf().set(opt).from(fullHtml, 'string').save().then(function () {
             UI.showToast('PDF сохранён');
         }).catch(function () {
-            document.body.removeChild(container);
             UI.showToast('Ошибка сохранения PDF');
         });
     }
