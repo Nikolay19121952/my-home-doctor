@@ -107,10 +107,10 @@ const UI = {
 
         var container = document.createElement('div');
         container.className = 'pdf-page';
-        container.style.position = 'fixed';
+        container.style.position = 'absolute';
         container.style.left = '0';
         container.style.top = '0';
-        container.style.width = '210mm';
+        container.style.width = '700px';
         container.style.background = 'white';
         container.style.zIndex = '99999';
         container.style.fontFamily = 'Arial, sans-serif';
@@ -119,7 +119,6 @@ const UI = {
         container.style.color = '#222';
         container.style.padding = '30px';
         container.style.boxSizing = 'border-box';
-        container.style.overflow = 'auto';
 
         container.innerHTML = '<style>' + css + '</style>' + bodyHtml;
         document.body.appendChild(container);
