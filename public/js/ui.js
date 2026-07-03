@@ -107,12 +107,8 @@ const UI = {
 
         var container = document.createElement('div');
         container.className = 'pdf-page';
-        container.style.position = 'absolute';
-        container.style.left = '0';
-        container.style.top = '0';
         container.style.width = '700px';
         container.style.background = 'white';
-        container.style.zIndex = '99999';
         container.style.fontFamily = 'Arial, sans-serif';
         container.style.fontSize = '14px';
         container.style.lineHeight = '1.6';
