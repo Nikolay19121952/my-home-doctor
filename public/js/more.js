@@ -512,16 +512,7 @@ var More = {
             '<div class="footer">Документ сформирован приложением «Мой домашний доктор»</div>' +
             '</body></html>';
 
-        var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        var url = URL.createObjectURL(blob);
-        var link = document.createElement('a');
-        link.href = url;
-        link.download = 'analysis_' + (a.date || 'report') + '.html';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        UI.showToast('Файл сохранён');
+        UI.savePDF(html, 'analysis_' + (a.date || 'report') + '.pdf');
     },
 
     // ===== НАСТРОЙКИ (экспорт/импорт) =====

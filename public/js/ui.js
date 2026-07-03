@@ -96,5 +96,31 @@ const UI = {
         return age + ' ' + word;
     },
 
-    _toastTimer: null
+    _toastTimer: null,
+
+    savePDF: function (htmlContent, filename) {
+        var container = document.createElement('div');
+        container.innerHTML = htmlContent;
+        container.style.position = 'absolute';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.style.width = '700px';
+        document.body.appendChild(container);
+
+        var opt = {
+            margin: [10, 10, 10, 10],
+            filename: filename,
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(container).save().then(function () {
+            document.body.removeChild(container);
+            UI.showToast('PDF сохранён');
+        }).catch(function () {
+            document.body.removeChild(container);
+            UI.showToast('Ошибка сохранения PDF');
+        });
+    }
 };

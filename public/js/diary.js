@@ -389,16 +389,7 @@ var Diary = {
             '<div class="footer">Документ сформирован приложением «Мой домашний доктор»</div>' +
             '</body></html>';
 
-        var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'diary_batch_' + selected.length + '_entries.html';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        UI.showToast('Файл сохранён (' + selected.length + ' записей)');
+        UI.savePDF(html, 'diary_batch_' + selected.length + '_entries.pdf');
     },
 
     askDoctor: function (id) {
@@ -461,15 +452,6 @@ var Diary = {
             '<div class="footer">Документ сформирован приложением «Мой домашний доктор»</div>' +
             '</body></html>';
 
-        var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'diary_' + (entry.date || 'entry') + '.html';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        UI.showToast('Файл сохранён');
+        UI.savePDF(html, 'diary_' + (entry.date || 'entry') + '.pdf');
     }
 };

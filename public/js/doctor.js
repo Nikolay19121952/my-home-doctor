@@ -459,16 +459,7 @@ var Doctor = {
             '<div class="footer">Данный отчёт носит справочный характер и не является медицинским заключением.</div>' +
             '</body></html>';
 
-        var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'doctor_report_' + dateFile + '.html';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        UI.showToast('Файл сохранён');
+        UI.savePDF(html, 'doctor_report_' + dateFile + '.pdf');
     },
 
     showTyping: function () {
