@@ -512,10 +512,16 @@ var More = {
             '<div class="footer">Документ сформирован приложением «Мой домашний доктор»</div>' +
             '</body></html>';
 
-        var w = window.open('', '_blank');
-        w.document.write(html);
-        w.document.close();
-        w.print();
+        var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        link.href = url;
+        link.download = 'analysis_' + (a.date || 'report') + '.html';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        UI.showToast('Файл сохранён');
     },
 
     // ===== НАСТРОЙКИ (экспорт/импорт) =====
@@ -644,15 +650,17 @@ var More = {
             '<div><strong>Семья</strong> — создайте профили членов семьи с указанием возраста, ' +
             'хронических заболеваний и принимаемых лекарств. Доктор учтёт эту информацию при консультации.</div></div>' +
             '<div class="about-step"><span class="about-step-icon">📋</span>' +
-            '<div><strong>Дневник</strong> — ведите ежедневные записи о самочувствии, давлении, ' +
-            'температуре и других показателях здоровья.</div></div>' +
+            '<div><strong>Дневник</strong> — ведите ежедневные записи о самочувствии: давление, пульс, сахар, ' +
+            'температура, вес. Отметьте галочками нужные записи — появится панель с кнопками ' +
+            '«🩺 Отправить доктору» (отправка пакета измерений на анализ) и «💾 Файл» (скачать выбранные записи). ' +
+            'Кнопка «💾 Файл» у каждой записи сохраняет одно измерение. Все файлы загружаются в папку Downloads.</div></div>' +
             '<div class="about-step"><span class="about-step-icon">🩺</span>' +
             '<div><strong>Доктор</strong> — чат с ИИ-доктором. Опишите симптомы, прикрепите файлы анализов ' +
             '(PDF, фото) через кнопку 📎 или перетащите их в чат. Доктор расшифрует результаты и даст рекомендации. ' +
-            'Ответы можно распечатать кнопкой 🖨️ Печать.</div></div>' +
+            'Каждый ответ доктора имеет кнопки: 🖨️ Печать и 💾 Файл (скачать в папку Downloads).</div></div>' +
             '<div class="about-step"><span class="about-step-icon">📄</span>' +
             '<div><strong>Анализы</strong> — храните результаты обследований с прикреплёнными PDF-файлами. ' +
-            'Кнопка «Спросить доктора» отправит файлы на расшифровку.</div></div>' +
+            'Кнопка «Спросить доктора» отправит файлы на расшифровку. Кнопка «💾 Сохранить в файл» скачает результат в папку Downloads.</div></div>' +
             '<div class="about-step"><span class="about-step-icon">🔔</span>' +
             '<div><strong>Напоминания</strong> — создавайте напоминания о приёме лекарств и визитах к врачу. ' +
             'Кнопка 📅 добавит событие в Google Календарь.</div></div>' +

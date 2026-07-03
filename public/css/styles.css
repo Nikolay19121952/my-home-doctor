@@ -428,6 +428,13 @@ body {
     font-size: 14px;
     font-weight: 600;
     color: #1e40af;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.diary-batch-buttons {
+    display: flex;
+    gap: 8px;
 }
 
 .diary-checkbox {
