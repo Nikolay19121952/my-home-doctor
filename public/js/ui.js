@@ -99,27 +99,36 @@ const UI = {
     _toastTimer: null,
 
     savePDF: function (htmlContent, filename) {
-        var container = document.createElement('div');
-        container.style.position = 'absolute';
-        container.style.left = '-9999px';
-        container.style.top = '0';
-        container.style.width = '700px';
-
         var styleMatch = htmlContent.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
         var bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
 
-        var inner = '';
-        if (styleMatch) inner += '<style>' + styleMatch[1] + '</style>';
-        inner += bodyMatch ? bodyMatch[1] : htmlContent;
-        container.innerHTML = inner;
+        var css = styleMatch ? styleMatch[1].replace(/body\s*\{/g, '.pdf-page{') : '';
+        var bodyHtml = bodyMatch ? bodyMatch[1] : htmlContent;
 
+        var container = document.createElement('div');
+        container.className = 'pdf-page';
+        container.style.position = 'fixed';
+        container.style.left = '0';
+        container.style.top = '0';
+        container.style.width = '210mm';
+        container.style.background = 'white';
+        container.style.zIndex = '99999';
+        container.style.fontFamily = 'Arial, sans-serif';
+        container.style.fontSize = '14px';
+        container.style.lineHeight = '1.6';
+        container.style.color = '#222';
+        container.style.padding = '30px';
+        container.style.boxSizing = 'border-box';
+        container.style.overflow = 'auto';
+
+        container.innerHTML = '<style>' + css + '</style>' + bodyHtml;
         document.body.appendChild(container);
 
         var opt = {
             margin: [10, 10, 10, 10],
             filename: filename,
             image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { scale: 2, useCORS: true },
+            html2canvas: { scale: 2, useCORS: true, scrollY: 0, windowWidth: container.scrollWidth },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
