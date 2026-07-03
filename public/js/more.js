@@ -470,49 +470,30 @@ var More = {
         for (var i = 0; i < analyses.length; i++) {
             if (analyses[i].id === id) { a = analyses[i]; break; }
         }
-        if (!a) return;
-
-        var profile = a.profileId ? Storage.getProfileById(a.profileId) : null;
-        var date = new Date().toLocaleDateString('ru-RU');
-
-        var body = '';
-        body += '<h2>' + UI.escapeHtml(a.name) + '</h2>';
-        if (a.date) body += '<p><strong>Дата:</strong> ' + UI.escapeHtml(Diary.formatDate(a.date)) + '</p>';
-        if (profile) body += '<p><strong>Пациент:</strong> ' + UI.escapeHtml(profile.name) + '</p>';
-        if (a.result) {
-            body += '<hr><h3>Результаты / заключение</h3>';
-            body += '<p>' + UI.escapeHtml(a.result).replace(/\n/g, '<br>') + '</p>';
+        if (!a || !a.files || a.files.length === 0) {
+            UI.showToast('Нет прикреплённых файлов');
+            return Promise.resolve();
         }
-        if (a.files && a.files.length > 0) {
-            body += '<hr><h3>Прикреплённые файлы</h3><ul>';
-            for (var j = 0; j < a.files.length; j++) {
-                body += '<li>' + UI.escapeHtml(a.files[j].name) + '</li>';
+
+        var saved = 0;
+        function saveNext() {
+            if (saved >= a.files.length) {
+                UI.showToast('Сохранено ' + a.files.length + ' файлов');
+                return Promise.resolve();
             }
-            body += '</ul>';
+            var f = a.files[saved];
+            var link = document.createElement('a');
+            link.href = f.data;
+            link.download = f.name;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            saved++;
+            return new Promise(function (resolve) {
+                setTimeout(function () { saveNext().then(resolve); }, 500);
+            });
         }
-
-        var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-            '<title>Анализ — ' + UI.escapeHtml(a.name) + '</title>' +
-            '<style>' +
-            'body{font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:30px;color:#222;font-size:14px;line-height:1.6}' +
-            '.header{text-align:center;border-bottom:2px solid #2563eb;padding-bottom:16px;margin-bottom:24px}' +
-            '.header h1{color:#2563eb;margin:0;font-size:22px}' +
-            '.header p{margin:4px 0;color:#666;font-size:13px}' +
-            'h2{color:#2563eb;font-size:18px}' +
-            'h3{color:#1e40af;font-size:15px;margin-top:16px}' +
-            'hr{border:none;border-top:1px solid #ddd;margin:16px 0}' +
-            'p{margin:6px 0}' +
-            'ul{margin:8px 0;padding-left:24px}' +
-            'li{margin:4px 0}' +
-            '.footer{text-align:center;margin-top:30px;padding-top:16px;border-top:1px solid #ddd;color:#999;font-size:11px}' +
-            '@media print{body{padding:15px}}' +
-            '</style></head><body>' +
-            '<div class="header"><h1>🩺 Мой домашний доктор</h1><p>Анализы и обследования · ' + date + '</p></div>' +
-            body +
-            '<div class="footer">Документ сформирован приложением «Мой домашний доктор»</div>' +
-            '</body></html>';
-
-        return UI.savePDF(html, 'analysis_' + (a.date || 'report') + '.pdf');
+        return saveNext();
     },
 
     // ===== НАСТРОЙКИ (экспорт/импорт) =====
