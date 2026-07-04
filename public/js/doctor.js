@@ -260,7 +260,8 @@ var Doctor = {
             history: apiHistory,
             profileContext: Doctor.getProfileContext(),
             analysesContext: Doctor.getAnalysesContext(),
-            files: files
+            files: files,
+            accessCode: localStorage.getItem('hd_access_code') || ''
         });
 
         var xhr = new XMLHttpRequest();
@@ -286,6 +287,15 @@ var Doctor = {
                 } catch (e) {
                     Doctor.addBubble('assistant', 'Произошла ошибка при обработке ответа.');
                 }
+            } else if (xhr.status === 403) {
+                try {
+                    var errData403 = JSON.parse(xhr.responseText);
+                    if (errData403.error === 'access_code_required') {
+                        Doctor.showAccessCodePrompt(text, files);
+                        return;
+                    }
+                } catch (e) {}
+                Doctor.addBubble('assistant', 'Доступ запрещён.');
             } else {
                 try {
                     var errData = JSON.parse(xhr.responseText);
@@ -506,5 +516,53 @@ var Doctor = {
         for (var i = 0; i < history.length; i++) {
             Doctor.addBubble(history[i].role, history[i].content);
         }
+    },
+
+    showAccessCodePrompt: function (pendingText, pendingFiles) {
+        var overlay = document.getElementById('modal-overlay');
+        document.getElementById('modal-title').textContent = 'Код доступа';
+        document.getElementById('modal-message').innerHTML =
+            '<p style="margin-bottom:12px;">Для доступа к консультации доктора введите код:</p>' +
+            '<input type="password" id="access-code-input" placeholder="Введите код" ' +
+            'style="width:100%;padding:10px;font-size:16px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box;">';
+        document.getElementById('modal-confirm').textContent = 'Войти';
+        overlay.style.display = 'flex';
+
+        setTimeout(function () {
+            var inp = document.getElementById('access-code-input');
+            if (inp) inp.focus();
+        }, 100);
+
+        var confirmBtn = document.getElementById('modal-confirm');
+        var cancelBtn = document.getElementById('modal-cancel');
+
+        function cleanup() {
+            overlay.style.display = 'none';
+            confirmBtn.removeEventListener('click', handleConfirm);
+            cancelBtn.removeEventListener('click', handleCancel);
+        }
+
+        function handleConfirm() {
+            var code = document.getElementById('access-code-input').value.trim();
+            cleanup();
+            if (code) {
+                localStorage.setItem('hd_access_code', code);
+                Doctor.addBubble('assistant', 'Код принят. Отправляю ваш вопрос доктору...');
+                document.getElementById('chat-input').value = pendingText;
+                Doctor._pendingFiles = pendingFiles && pendingFiles.length > 0 ? pendingFiles : null;
+                Doctor.isLoading = false;
+                Doctor.sendMessage();
+            } else {
+                Doctor.addBubble('assistant', 'Код не введён. Для общения с доктором необходим код доступа.');
+            }
+        }
+
+        function handleCancel() {
+            cleanup();
+            Doctor.addBubble('assistant', 'Для общения с доктором необходим код доступа. Обратитесь к администратору.');
+        }
+
+        confirmBtn.addEventListener('click', handleConfirm);
+        cancelBtn.addEventListener('click', handleCancel);
     }
 };

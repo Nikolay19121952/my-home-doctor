@@ -5,6 +5,7 @@ var path = require('path');
 var app = express();
 var PORT = process.env.PORT || 3000;
 var API_KEY = process.env.ANTHROPIC_API_KEY || '';
+var ACCESS_CODE = process.env.ACCESS_CODE || '';
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -73,6 +74,10 @@ var SYSTEM_PROMPT = [
 app.post('/api/chat', function (req, res) {
     if (!API_KEY) {
         return res.status(500).json({ error: 'API ключ не настроен на сервере' });
+    }
+
+    if (ACCESS_CODE && req.body.accessCode !== ACCESS_CODE) {
+        return res.status(403).json({ error: 'access_code_required' });
     }
 
     var userMessage = req.body.message;
