@@ -102,19 +102,25 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="profile-blood">Группа крови</label>
-                        <select id="profile-blood">
-                            <option value="">Не указана</option>
-                            <option value="O+">I (O) положительная</option>
-                            <option value="O-">I (O) отрицательная</option>
-                            <option value="A+">II (A) положительная</option>
-                            <option value="A-">II (A) отрицательная</option>
-                            <option value="B+">III (B) положительная</option>
-                            <option value="B-">III (B) отрицательная</option>
-                            <option value="AB+">IV (AB) положительная</option>
-                            <option value="AB-">IV (AB) отрицательная</option>
-                        </select>
+                    <div class="form-row">
+                        <div class="form-group form-group-half">
+                            <label for="profile-blood">Группа крови</label>
+                            <select id="profile-blood">
+                                <option value="">Не указана</option>
+                                <option value="O+">I (O) положительная</option>
+                                <option value="O-">I (O) отрицательная</option>
+                                <option value="A+">II (A) положительная</option>
+                                <option value="A-">II (A) отрицательная</option>
+                                <option value="B+">III (B) положительная</option>
+                                <option value="B-">III (B) отрицательная</option>
+                                <option value="AB+">IV (AB) положительная</option>
+                                <option value="AB-">IV (AB) отрицательная</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-half">
+                            <label for="profile-height">Рост (см)</label>
+                            <input type="number" id="profile-height" placeholder="170" min="50" max="250">
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -135,6 +141,24 @@
                     <div class="form-group">
                         <label for="profile-surgeries">Перенесённые операции</label>
                         <textarea id="profile-surgeries" rows="2" placeholder="Например: аппендэктомия 1985 г."></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group form-group-half">
+                            <label for="profile-last-visit">Последний визит к врачу</label>
+                            <input type="date" id="profile-last-visit">
+                        </div>
+                        <div class="form-group form-group-half">
+                            <label for="profile-smoking">Курение / алкоголь</label>
+                            <select id="profile-smoking">
+                                <option value="">Не указано</option>
+                                <option value="none">Не курю, не пью</option>
+                                <option value="smoking">Курю</option>
+                                <option value="alcohol">Употребляю алкоголь</option>
+                                <option value="both">Курю и пью</option>
+                                <option value="former">Бросил(а)</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="form-group">

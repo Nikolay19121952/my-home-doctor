@@ -100,10 +100,13 @@ var Profiles = {
             { label: 'Дата рождения', value: profile.birthDate ? UI.formatDate(profile.birthDate) + ' (' + UI.pluralAge(UI.calculateAge(profile.birthDate)) + ')' : '' },
             { label: 'Пол', value: profile.gender === 'male' ? 'Мужской' : (profile.gender === 'female' ? 'Женский' : '') },
             { label: 'Группа крови', value: profile.bloodType || '' },
+            { label: 'Рост', value: profile.height ? profile.height + ' см' : '' },
             { label: 'Хронические заболевания', value: profile.chronicConditions || '' },
             { label: 'Аллергии', value: profile.allergies || '' },
             { label: 'Принимаемые лекарства', value: profile.medications || '' },
             { label: 'Перенесённые операции', value: profile.surgeries || '' },
+            { label: 'Последний визит к врачу', value: profile.lastVisit ? UI.formatDate(profile.lastVisit) : '' },
+            { label: 'Курение / алкоголь', value: Profiles.smokingLabel(profile.smoking) },
             { label: 'Заметки', value: profile.notes || '' }
         ];
 
@@ -135,10 +138,13 @@ var Profiles = {
             document.getElementById('profile-name').value = profile.name || '';
             document.getElementById('profile-birthdate').value = profile.birthDate || '';
             document.getElementById('profile-blood').value = profile.bloodType || '';
+            document.getElementById('profile-height').value = profile.height || '';
             document.getElementById('profile-chronic').value = profile.chronicConditions || '';
             document.getElementById('profile-allergies').value = profile.allergies || '';
             document.getElementById('profile-medications').value = profile.medications || '';
             document.getElementById('profile-surgeries').value = profile.surgeries || '';
+            document.getElementById('profile-last-visit').value = profile.lastVisit || '';
+            document.getElementById('profile-smoking').value = profile.smoking || '';
             document.getElementById('profile-notes').value = profile.notes || '';
             if (profile.gender) Profiles.setGender(profile.gender);
             document.getElementById('delete-profile-section').style.display = 'block';
@@ -172,10 +178,13 @@ var Profiles = {
             birthDate: document.getElementById('profile-birthdate').value || '',
             gender: Profiles._selectedGender || '',
             bloodType: document.getElementById('profile-blood').value || '',
+            height: document.getElementById('profile-height').value || '',
             chronicConditions: document.getElementById('profile-chronic').value.trim(),
             allergies: document.getElementById('profile-allergies').value.trim(),
             medications: document.getElementById('profile-medications').value.trim(),
             surgeries: document.getElementById('profile-surgeries').value.trim(),
+            lastVisit: document.getElementById('profile-last-visit').value || '',
+            smoking: document.getElementById('profile-smoking').value || '',
             notes: document.getElementById('profile-notes').value.trim()
         };
 
@@ -209,6 +218,17 @@ var Profiles = {
                 UI.showToast('Профиль удалён');
             }
         );
+    },
+
+    smokingLabel: function (value) {
+        var labels = {
+            'none': 'Не курю, не пью',
+            'smoking': 'Курю',
+            'alcohol': 'Употребляю алкоголь',
+            'both': 'Курю и пью',
+            'former': 'Бросил(а)'
+        };
+        return labels[value] || '';
     },
 
     _viewingId: null,

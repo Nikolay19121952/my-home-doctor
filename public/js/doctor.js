@@ -216,8 +216,13 @@ var Doctor = {
                 if (age !== null) parts.push(UI.pluralAge(age));
             }
             if (p.gender) parts.push(p.gender === 'male' ? 'мужчина' : 'женщина');
-            if (p.chronicConditions) parts.push('хронические: ' + p.chronicConditions);
+            if (p.height) parts.push('рост: ' + p.height + ' см');
+            if (p.chronicConditions) parts.push('диагнозы: ' + p.chronicConditions);
+            if (p.allergies) parts.push('аллергии: ' + p.allergies);
             if (p.medications) parts.push('лекарства: ' + p.medications);
+            if (p.surgeries) parts.push('операции: ' + p.surgeries);
+            if (p.lastVisit) parts.push('последний визит к врачу: ' + UI.formatDate(p.lastVisit));
+            if (p.smoking) parts.push('вредные привычки: ' + Profiles.smokingLabel(p.smoking));
             lines.push(parts.join(', '));
         }
         return lines.join('\n');
