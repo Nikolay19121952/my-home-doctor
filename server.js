@@ -130,7 +130,7 @@ app.post('/api/chat', function (req, res) {
     }
     messages.push({ role: 'user', content: userContent });
 
-    var maxTokens = files.length > 0 ? 4096 : 1024;
+    var maxTokens = 4096;
 
     var requestBody = JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
