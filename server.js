@@ -133,7 +133,7 @@ app.post('/api/chat', function (req, res) {
     var maxTokens = 16384;
 
     var requestBody = JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-5',
         max_tokens: maxTokens,
         system: systemContent,
         messages: messages
