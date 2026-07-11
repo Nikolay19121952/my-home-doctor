@@ -158,19 +158,26 @@ app.post('/api/chat', function (req, res) {
         apiRes.on('end', function () {
             try {
                 var parsed = JSON.parse(data);
-                if (parsed.error) {
-                    return res.status(400).json({ error: parsed.error.message });
+                if (parsed.type === 'error' || parsed.error) {
+                    var errMsg = (parsed.error && parsed.error.message) || JSON.stringify(parsed);
+                    console.error('API error:', apiRes.statusCode, errMsg);
+                    return res.status(apiRes.statusCode || 400).json({ error: errMsg });
                 }
                 var reply = parsed.content && parsed.content[0] && parsed.content[0].text;
+                if (!reply) {
+                    console.error('Empty reply:', JSON.stringify(parsed).substring(0, 500));
+                }
                 res.json({ reply: reply || 'Не удалось получить ответ.' });
             } catch (e) {
-                res.status(500).json({ error: 'Ошибка обработки ответа' });
+                console.error('Parse error:', e.message, 'data:', data.substring(0, 500));
+                res.status(500).json({ error: 'Ошибка обработки ответа: ' + e.message });
             }
         });
     });
 
-    apiReq.on('error', function () {
-        res.status(500).json({ error: 'Ошибка подключения к API' });
+    apiReq.on('error', function (e) {
+        console.error('Request error:', e.message);
+        res.status(500).json({ error: 'Ошибка подключения к API: ' + e.message });
     });
 
     apiReq.write(requestBody);
