@@ -130,10 +130,10 @@ app.post('/api/chat', function (req, res) {
     }
     messages.push({ role: 'user', content: userContent });
 
-    var maxTokens = 8192;
+    var maxTokens = 16384;
 
     var requestBody = JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: maxTokens,
         system: systemContent,
         messages: messages
@@ -152,6 +152,7 @@ app.post('/api/chat', function (req, res) {
     };
 
     var apiReq = https.request(options, function (apiRes) {
+        apiRes.setEncoding('utf8');
         var data = '';
         apiRes.on('data', function (chunk) { data += chunk; });
         apiRes.on('end', function () {
