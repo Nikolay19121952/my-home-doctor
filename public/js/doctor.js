@@ -4,6 +4,7 @@ var Doctor = {
     _pendingFiles: null,
 
     _droppedFiles: [],
+    _accumulatedParts: [],
 
     init: function () {
         var sendBtn = document.getElementById('btn-send-message');
@@ -276,7 +277,12 @@ var Doctor = {
                 try {
                     var data = JSON.parse(xhr.responseText);
                     var reply = data.reply || 'Не удалось получить ответ.';
-                    Doctor.addBubble('assistant', reply);
+
+                    var MARKER = '[ПРОДОЛЖЕНИЕ]';
+                    var hasMore = reply.indexOf(MARKER) !== -1;
+                    if (hasMore) {
+                        reply = reply.replace(MARKER, '').trim();
+                    }
 
                     history.push({ role: 'user', content: text });
                     history.push({ role: 'assistant', content: reply });
@@ -284,7 +290,21 @@ var Doctor = {
                         history = history.slice(history.length - 40);
                     }
                     Doctor.saveHistory(history);
+
+                    if (hasMore) {
+                        Doctor._accumulatedParts.push(reply);
+                        Doctor.addBubble('assistant', reply, false);
+                        Doctor._autoSend(history);
+                    } else if (Doctor._accumulatedParts.length > 0) {
+                        Doctor._accumulatedParts.push(reply);
+                        var fullText = Doctor._accumulatedParts.join('\n\n');
+                        Doctor.addBubble('assistant', reply, true, fullText);
+                        Doctor._accumulatedParts = [];
+                    } else {
+                        Doctor.addBubble('assistant', reply);
+                    }
                 } catch (e) {
+                    Doctor._accumulatedParts = [];
                     Doctor.addBubble('assistant', 'Произошла ошибка при обработке ответа.');
                 }
             } else if (xhr.status === 403) {
@@ -315,7 +335,90 @@ var Doctor = {
         xhr.send(body);
     },
 
-    addBubble: function (role, text) {
+    _autoSend: function (history) {
+        Doctor.isLoading = true;
+        Doctor.showTyping();
+
+        var apiHistory = [];
+        for (var i = 0; i < history.length; i++) {
+            apiHistory.push({ role: history[i].role, content: history[i].content });
+        }
+
+        var body = JSON.stringify({
+            message: 'Продолжай',
+            history: apiHistory,
+            profileContext: Doctor.getProfileContext(),
+            analysesContext: '',
+            files: [],
+            accessCode: localStorage.getItem('hd_access_code') || ''
+        });
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/chat', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+
+        xhr.onload = function () {
+            Doctor.hideTyping();
+            Doctor.isLoading = false;
+
+            if (xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    var reply = data.reply || '';
+
+                    var MARKER = '[ПРОДОЛЖЕНИЕ]';
+                    var hasMore = reply.indexOf(MARKER) !== -1;
+                    if (hasMore) {
+                        reply = reply.replace(MARKER, '').trim();
+                    }
+
+                    history.push({ role: 'user', content: 'Продолжай' });
+                    history.push({ role: 'assistant', content: reply });
+                    if (history.length > 40) {
+                        history = history.slice(history.length - 40);
+                    }
+                    Doctor.saveHistory(history);
+
+                    if (hasMore) {
+                        Doctor._accumulatedParts.push(reply);
+                        Doctor.addBubble('assistant', reply, false);
+                        Doctor._autoSend(history);
+                    } else {
+                        Doctor._accumulatedParts.push(reply);
+                        var fullText = Doctor._accumulatedParts.join('\n\n');
+                        Doctor.addBubble('assistant', reply, true, fullText);
+                        Doctor._accumulatedParts = [];
+                    }
+                } catch (e) {
+                    var partialText = Doctor._accumulatedParts.join('\n\n');
+                    Doctor._accumulatedParts = [];
+                    if (partialText) {
+                        Doctor.addBubble('assistant', '(Документ получен частично)', true, partialText);
+                    }
+                }
+            } else {
+                var partialText = Doctor._accumulatedParts.join('\n\n');
+                Doctor._accumulatedParts = [];
+                if (partialText) {
+                    Doctor.addBubble('assistant', '(Ошибка при получении продолжения)', true, partialText);
+                }
+            }
+        };
+
+        xhr.onerror = function () {
+            Doctor.hideTyping();
+            Doctor.isLoading = false;
+            var partialText = Doctor._accumulatedParts.join('\n\n');
+            Doctor._accumulatedParts = [];
+            if (partialText) {
+                Doctor.addBubble('assistant', '(Не удалось получить продолжение)', true, partialText);
+            }
+        };
+
+        xhr.send(body);
+    },
+
+    addBubble: function (role, text, showButtons, fullText) {
         var container = document.getElementById('chat-messages');
         var bubble = document.createElement('div');
         bubble.className = role === 'user' ? 'chat-bubble chat-bubble-user' : 'chat-bubble chat-bubble-bot';
@@ -325,17 +428,18 @@ var Doctor = {
             .replace(/\n/g, '<br>');
         bubble.innerHTML = '<p>' + formatted + '</p>';
 
-        if (role === 'assistant') {
+        if (role === 'assistant' && showButtons !== false) {
+            var textForBtns = fullText || text;
             var btnWrap = document.createElement('div');
             btnWrap.className = 'chat-bubble-actions';
             var printBtn = document.createElement('button');
             printBtn.className = 'btn btn-outline btn-print';
             printBtn.innerHTML = '🖨️ Печать';
-            printBtn.onclick = function () { Doctor.printReport(text); };
+            printBtn.onclick = function () { Doctor.printReport(textForBtns); };
             var fileBtn = document.createElement('button');
             fileBtn.className = 'btn btn-outline btn-print';
             fileBtn.innerHTML = '💾 Файл';
-            fileBtn.onclick = function () { Doctor.saveReportToFile(text); };
+            fileBtn.onclick = function () { Doctor.saveReportToFile(textForBtns); };
             btnWrap.appendChild(printBtn);
             btnWrap.appendChild(fileBtn);
             bubble.appendChild(btnWrap);
