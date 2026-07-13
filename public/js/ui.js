@@ -104,16 +104,22 @@ const UI = {
         var css = styleMatch ? styleMatch[1] : '';
         var bodyHtml = bodyMatch ? bodyMatch[1] : htmlContent;
 
+        var pdfCss = css +
+            'h2,h3,h4,table,.patient-info,.header,.footer{page-break-inside:avoid;break-inside:avoid}' +
+            'p{page-break-inside:avoid;break-inside:avoid;orphans:3;widows:3}' +
+            'tr{page-break-inside:avoid;break-inside:avoid}';
+
         var fullHtml = '<div style="width:640px;padding:30px;font-family:Arial,sans-serif;' +
             'font-size:14px;line-height:1.6;color:#222;background:white;">' +
-            '<style>' + css + '</style>' + bodyHtml + '</div>';
+            '<style>' + pdfCss + '</style>' + bodyHtml + '</div>';
 
         var opt = {
             margin: [10, 10, 10, 10],
             filename: filename,
             image: { type: 'jpeg', quality: 0.95 },
             html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, x: 0, y: 0, windowWidth: 700 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
         };
 
         return html2pdf().set(opt).from(fullHtml, 'string').save().then(function () {
