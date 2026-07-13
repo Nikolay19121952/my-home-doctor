@@ -173,6 +173,9 @@ app.post('/api/chat', function (req, res) {
                 if (!reply) {
                     console.error('Empty reply:', JSON.stringify(parsed).substring(0, 500));
                 }
+                if (parsed.stop_reason === 'max_tokens' && reply) {
+                    reply += '\n[ПРОДОЛЖЕНИЕ]';
+                }
                 res.json({ reply: reply || 'Не удалось получить ответ.' });
             } catch (e) {
                 console.error('Parse error:', e.message, 'data:', data.substring(0, 500));
