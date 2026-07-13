@@ -522,63 +522,8 @@ var Doctor = {
     },
 
     saveReportToFile: function (text) {
-        var profileCtx = Doctor.getProfileContext();
-        var date = new Date().toLocaleDateString('ru-RU');
-        var dateFile = new Date().toISOString().slice(0, 10);
-
-        var lines = text.split('\n');
-        var htmlBody = '';
-        for (var i = 0; i < lines.length; i++) {
-            var line = lines[i];
-            if (line.match(/^#{1,3}\s/)) {
-                var level = line.match(/^(#{1,3})\s/)[1].length;
-                var hText = UI.escapeHtml(line.replace(/^#{1,3}\s/, ''));
-                htmlBody += '<h' + (level + 1) + '>' + hText + '</h' + (level + 1) + '>';
-            } else if (line.indexOf('|') === 0 && line.lastIndexOf('|') > 0) {
-                var cells = line.split('|').filter(function (c) { return c.trim() !== ''; });
-                if (cells.length > 0 && cells[0].trim().match(/^[-:]+$/)) continue;
-                if (!htmlBody.match(/<table[^>]*>(?:(?!<\/table>)[\s\S])*$/)) {
-                    htmlBody += '<table><tr>';
-                } else {
-                    htmlBody += '<tr>';
-                }
-                for (var c = 0; c < cells.length; c++) {
-                    htmlBody += '<td>' + UI.escapeHtml(cells[c].trim()).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>') + '</td>';
-                }
-                htmlBody += '</tr>';
-                var nextLine = i + 1 < lines.length ? lines[i + 1] : '';
-                if (nextLine.indexOf('|') !== 0) htmlBody += '</table>';
-            } else if (line.trim() === '---') {
-                htmlBody += '<hr>';
-            } else if (line.trim() === '') {
-                htmlBody += '<br>';
-            } else {
-                htmlBody += '<p>' + UI.escapeHtml(line).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>') + '</p>';
-            }
-        }
-
-        var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-            '<title>Отчёт — Мой домашний доктор</title>' +
-            '<style>' +
-            'body{font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:30px;color:#222;font-size:14px;line-height:1.6}' +
-            '.header{text-align:center;border-bottom:2px solid #2563eb;padding-bottom:16px;margin-bottom:24px}' +
-            '.header h1{color:#2563eb;margin:0;font-size:22px}' +
-            '.header p{margin:4px 0;color:#666;font-size:13px}' +
-            '.patient-info{background:#f0f7ff;padding:12px 16px;border-radius:8px;margin-bottom:20px;font-size:13px}' +
-            'h2{color:#2563eb;font-size:17px;margin-top:20px}h3{color:#1e40af;font-size:15px}' +
-            'table{width:100%;border-collapse:collapse;margin:12px 0}' +
-            'td{border:1px solid #ccc;padding:6px 10px;font-size:13px}' +
-            'tr:first-child td{background:#e8f0fe;font-weight:bold}' +
-            'p{margin:4px 0}' +
-            '.footer{text-align:center;margin-top:30px;padding-top:16px;border-top:1px solid #ddd;color:#999;font-size:11px}' +
-            '</style></head><body>' +
-            '<div class="header"><h1>🩺 Мой домашний доктор</h1><p>Отчёт от ' + date + '</p></div>' +
-            (profileCtx ? '<div class="patient-info">' + UI.escapeHtml(profileCtx).replace(/\n/g, '<br>') + '</div>' : '') +
-            htmlBody +
-            '<div class="footer">Данный отчёт носит справочный характер и не является медицинским заключением.</div>' +
-            '</body></html>';
-
-        return UI.savePDF(html, 'doctor_report_' + dateFile + '.pdf');
+        Doctor.printReport(text);
+        UI.showToast('Для сохранения в PDF: выберите принтер «Сохранить как PDF»', 4000);
     },
 
     showTyping: function () {
