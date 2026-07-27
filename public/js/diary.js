@@ -1,251 +1,1439 @@
+/* ============================================================================
+ * ДНЕВНИК ЗДОРОВЬЯ — версия 2.1 (WEB/PWA)
+ * Реализация по ТЗ v2.1 «Раздел ДНЕВНИК приложения МОЙ ДОМАШНИЙ ДОКТОР»
+ *
+ * Главная идея ТЗ: одна ЗАПИСЬ = все измерения за ОДИН ДЕНЬ (от 1 до 36).
+ *
+ * Три экрана (в терминологии ТЗ — «макеты»):
+ *   Макет №2  — список дневников + панель управления (VIEW_LIST)
+ *   Макет №3  — форма записи измерений, таблица 36×8      (VIEW_FORM)
+ *   Макет №4  — чат с историей консультаций Claude        (VIEW_CHAT)
+ *
+ * Хранилище — localStorage браузера (никаких файлов на диске).
+ * ========================================================================== */
+
 var Diary = {
-    DIARY_KEY: 'mdd_diary',
-    currentProfile: null,
-    _selectedIds: [],
 
+    /* --- Ключи localStorage ------------------------------------------------ */
+    RECORDS_KEY: 'mdd_diary_records',   // завершённые записи по дням
+    CURRENT_KEY: 'mdd_diary_current',   // текущий незавершённый черновик
+    CHAT_KEY: 'mdd_diary_chat',         // история консультаций по дневнику
+    SETTINGS_KEY: 'mdd_diary_settings', // настройки раздела
+    LEGACY_KEY: 'mdd_diary',            // старый формат (v1) — для переноса
+    LEGACY_BACKUP_KEY: 'mdd_diary_v1_backup',
+
+    MAX_ROWS: 36,       // лимит измерений в одном дне (валидация №12)
+    VISIBLE_ROWS: 12,   // сколько строк показывать без прокрутки
+
+    /* --- Допустимые диапазоны (раздел 4.2 ТЗ) ------------------------------ */
+    RANGES: {
+        ad_top: { min: 60, max: 250, label: 'АД верх', unit: 'мм рт.ст', show: '60–250' },
+        ad_bottom: { min: 30, max: 150, label: 'АД низ', unit: 'мм рт.ст', show: '30–150' },
+        pulse: { min: 20, max: 200, label: 'пульса', unit: 'уд/мин', show: '20–200' },
+        sugar: { min: 2.0, max: 20.0, label: 'сахара', unit: 'ммоль/л', show: '2.0–20.0' },
+        temperature: { min: 34.0, max: 43.0, label: 'температуры', unit: '°C', show: '34.0–43.0' },
+        weight: { min: 20, max: 250, label: 'веса', unit: 'кг', show: '20–250' }
+    },
+
+    FIELDS: ['time', 'ad_top', 'ad_bottom', 'pulse', 'sugar', 'temperature', 'weight'],
+
+    /* --- Состояние экрана -------------------------------------------------- */
+    view: 'list',
+    _selectedDays: [],   // отмеченные галочками дни в Макете №2
+    _filterFrom: '',
+    _filterTo: '',
+    _rowOffset: 0,       // прокрутка таблицы измерений кнопками «Вверх/Вниз»
+    _listOffset: 0,      // прокрутка списка записей
+    _dirty: false,       // есть несохранённые изменения (валидация №14)
+    _current: null,      // черновик записи, с которым работаем сейчас
+    _editingDay: null,   // если открыли на редактирование готовую запись
+    _sending: false,     // идёт запрос к Claude
+
+    /* ======================================================================
+     * ИНИЦИАЛИЗАЦИЯ
+     * ==================================================================== */
     init: function () {
-        var addBtn = document.getElementById('btn-add-entry');
-        var saveBtn = document.getElementById('btn-save-entry');
-        var cancelBtn = document.getElementById('btn-cancel-entry');
-        var profileSelect = document.getElementById('diary-profile');
+        Diary.migrateLegacy();
 
-        if (addBtn) {
-            addBtn.addEventListener('click', function () {
-                Diary.showForm();
-            });
-        }
-
-        if (saveBtn) {
-            saveBtn.addEventListener('click', function () {
-                Diary.saveEntry();
-            });
-        }
-
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', function () {
-                Diary.hideForm();
-            });
-        }
-
-        if (profileSelect) {
-            profileSelect.addEventListener('change', function () {
-                Diary.currentProfile = this.value;
-                Diary.renderEntries();
-            });
-        }
+        // Валидация №14: предупреждение при закрытии вкладки с черновиком
+        window.addEventListener('beforeunload', function (e) {
+            if (Diary.view === 'form' && Diary._dirty) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            }
+        });
     },
 
-    getEntries: function () {
-        var data = localStorage.getItem(Diary.DIARY_KEY);
-        if (!data) return [];
+    /* ----------------------------------------------------------------------
+     * Перенос данных из старого дневника (v1: одно измерение = одна запись).
+     * Старые записи группируются по дате и превращаются в записи нового
+     * формата. Исходные данные сохраняются под резервным ключом — ничего
+     * не теряется.
+     * -------------------------------------------------------------------- */
+    migrateLegacy: function () {
+        var raw = localStorage.getItem(Diary.LEGACY_KEY);
+        if (!raw) return;
+
+        var old;
         try {
-            return JSON.parse(data);
+            old = JSON.parse(raw);
         } catch (e) {
-            return [];
+            return;
         }
-    },
-
-    saveEntries: function (entries) {
-        localStorage.setItem(Diary.DIARY_KEY, JSON.stringify(entries));
-    },
-
-    showForm: function () {
-        document.getElementById('diary-form').style.display = 'block';
-        document.getElementById('btn-add-entry').style.display = 'none';
-        var now = new Date();
-        var dateStr = now.getFullYear() + '-' +
-            String(now.getMonth() + 1).padStart(2, '0') + '-' +
-            String(now.getDate()).padStart(2, '0');
-        var timeStr = String(now.getHours()).padStart(2, '0') + ':' +
-            String(now.getMinutes()).padStart(2, '0');
-        document.getElementById('entry-date').value = dateStr;
-        document.getElementById('entry-time').value = timeStr;
-    },
-
-    hideForm: function () {
-        document.getElementById('diary-form').style.display = 'none';
-        document.getElementById('btn-add-entry').style.display = '';
-        document.getElementById('entry-systolic').value = '';
-        document.getElementById('entry-diastolic').value = '';
-        document.getElementById('entry-pulse').value = '';
-        document.getElementById('entry-sugar').value = '';
-        document.getElementById('entry-temp').value = '';
-        document.getElementById('entry-weight').value = '';
-        document.getElementById('entry-notes').value = '';
-    },
-
-    saveEntry: function () {
-        var systolic = document.getElementById('entry-systolic').value.trim();
-        var diastolic = document.getElementById('entry-diastolic').value.trim();
-        var pulse = document.getElementById('entry-pulse').value.trim();
-        var sugar = document.getElementById('entry-sugar').value.trim();
-        var temp = document.getElementById('entry-temp').value.trim();
-        var weight = document.getElementById('entry-weight').value.trim();
-        var notes = document.getElementById('entry-notes').value.trim();
-        var date = document.getElementById('entry-date').value;
-        var time = document.getElementById('entry-time').value;
-
-        if (!systolic && !diastolic && !pulse && !sugar && !temp && !weight) {
-            UI.showToast('Заполните хотя бы одно поле');
+        if (!old || !old.length) {
+            localStorage.removeItem(Diary.LEGACY_KEY);
             return;
         }
 
-        var entry = {
-            id: Storage.generateId(),
-            profileId: Diary.currentProfile || '',
+        var records = Diary.getRecords();
+        var byDay = {};
+
+        for (var i = 0; i < old.length; i++) {
+            var e = old[i];
+            if (!e.date) continue;
+            if (!byDay[e.date]) byDay[e.date] = [];
+            byDay[e.date].push({
+                time: e.time || '00:00',
+                ad_top: e.systolic || null,
+                ad_bottom: e.diastolic || null,
+                pulse: e.pulse || null,
+                sugar: e.sugar || null,
+                temperature: e.temperature || null,
+                weight: e.weight || null,
+                notes: e.notes || ''
+            });
+        }
+
+        var migrated = 0;
+        for (var day in byDay) {
+            if (!byDay.hasOwnProperty(day)) continue;
+            if (records[day]) continue;   // не затираем уже существующее
+
+            var list = byDay[day].slice(0, Diary.MAX_ROWS);
+            list.sort(function (a, b) { return a.time < b.time ? -1 : 1; });
+            for (var n = 0; n < list.length; n++) list[n].id = n + 1;
+
+            records[day] = {
+                date: day,
+                measurements: list,
+                completed: true,
+                created_at: new Date(day + 'T00:00:00').toISOString(),
+                completed_at: new Date(day + 'T23:59:00').toISOString(),
+                migrated_from_v1: true
+            };
+            migrated++;
+        }
+
+        if (migrated > 0) {
+            Diary.saveRecords(records);
+        }
+        localStorage.setItem(Diary.LEGACY_BACKUP_KEY, raw);
+        localStorage.removeItem(Diary.LEGACY_KEY);
+    },
+
+    /* ======================================================================
+     * ХРАНИЛИЩЕ
+     * ==================================================================== */
+    _read: function (key, fallback) {
+        var data = localStorage.getItem(key);
+        if (!data) return fallback;
+        try {
+            var parsed = JSON.parse(data);
+            return parsed === null ? fallback : parsed;
+        } catch (e) {
+            return fallback;
+        }
+    },
+
+    getRecords: function () { return Diary._read(Diary.RECORDS_KEY, {}); },
+    saveRecords: function (r) { localStorage.setItem(Diary.RECORDS_KEY, JSON.stringify(r)); },
+
+    getChat: function () { return Diary._read(Diary.CHAT_KEY, []); },
+    saveChat: function (c) { localStorage.setItem(Diary.CHAT_KEY, JSON.stringify(c)); },
+
+    getSettings: function () {
+        return Diary._read(Diary.SETTINGS_KEY, { theme: 'light', language: 'ru' });
+    },
+    saveSettings: function (s) { localStorage.setItem(Diary.SETTINGS_KEY, JSON.stringify(s)); },
+
+    getCurrent: function () { return Diary._read(Diary.CURRENT_KEY, null); },
+    saveCurrent: function (c) {
+        if (c === null) {
+            localStorage.removeItem(Diary.CURRENT_KEY);
+        } else {
+            c.last_saved = new Date().toISOString();
+            localStorage.setItem(Diary.CURRENT_KEY, JSON.stringify(c));
+        }
+    },
+
+    /* Автосохранение — вызывается при каждом изменении ячейки (раздел 3.1) */
+    autosave: function () {
+        if (!Diary._current) return;
+        Diary.saveCurrent(Diary._current);
+        Diary._dirty = false;
+        Diary.updateSaveHint('Черновик сохранён автоматически');
+    },
+
+    /* ======================================================================
+     * ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ
+     * ==================================================================== */
+    render: function () {
+        if (Diary.view === 'form') return Diary.renderForm();
+        if (Diary.view === 'chat') return Diary.renderChat();
+        return Diary.renderList();
+    },
+
+    show: function (view) {
+        Diary.view = view;
+        Diary.render();
+        window.scrollTo(0, 0);
+    },
+
+    /* Точка входа из App.navigateTo('diary') */
+    renderEntries: function () {
+        Diary.render();
+    },
+
+    /* ======================================================================
+     * МАКЕТ №2 — ПАНЕЛЬ УПРАВЛЕНИЯ ЗАПИСЯМИ
+     * ==================================================================== */
+    renderList: function () {
+        var host = document.getElementById('diary-root');
+        if (!host) return;
+
+        var records = Diary.getRecords();
+        var allDays = Object.keys(records).sort(function (a, b) { return a < b ? 1 : -1; });
+        var days = Diary.applyFilter(allDays);
+        var current = Diary.getCurrent();
+
+        var html = '';
+
+        html += '<div class="dv-head">' +
+            '<h2 class="dv-title">📔 Мой дневник</h2>' +
+            '<p class="dv-sub">Показано ' + days.length + ' из ' + allDays.length +
+            (allDays.length === 1 ? ' записи' : ' записей') + '</p>' +
+            '</div>';
+
+        // Незавершённый черновик — заметная подсказка вернуться к нему
+        if (current && current.date) {
+            var filled = Diary.filledCount(current.measurements);
+            html += '<div class="dv-draft">' +
+                '<div class="dv-draft-text">✏️ Незавершённая запись за <strong>' +
+                UI.escapeHtml(Diary.formatDay(current.date)) + '</strong>' +
+                '<br><span class="dv-muted">Внесено измерений: ' + filled + '</span></div>' +
+                '<button class="btn btn-primary" onclick="Diary.openForm()">Продолжить</button>' +
+                '</div>';
+        }
+
+        // Фильтр по периоду (кнопка №1)
+        html += '<div class="dv-filter" id="dv-filter" style="display:' +
+            (Diary._filterFrom || Diary._filterTo ? 'block' : 'none') + '">' +
+            '<div class="dv-filter-row">' +
+            '<label>С даты<input type="date" id="dv-from" value="' + Diary._filterFrom + '"></label>' +
+            '<label>По дату<input type="date" id="dv-to" value="' + Diary._filterTo + '"></label>' +
+            '</div>' +
+            '<div class="dv-filter-btns">' +
+            '<button class="btn btn-primary btn-small" onclick="Diary.applyPeriod()">Показать</button>' +
+            '<button class="btn btn-outline btn-small" onclick="Diary.clearPeriod()">Сбросить</button>' +
+            '</div></div>';
+
+        // Панель управления — 7 кнопок ТЗ
+        html += '<div class="dv-panel">' +
+            Diary.panelBtn('1', '📅', 'Выбрать период', 'Diary.togglePeriod()') +
+            Diary.panelBtn('2', '⬆️', 'Прокрутить вверх', 'Diary.scrollList(-1)') +
+            Diary.panelBtn('3', '⬇️', 'Прокрутить вниз', 'Diary.scrollList(1)') +
+            Diary.panelBtn('4', '📝', 'Запись измерений', 'Diary.openForm()', 'dv-btn-main') +
+            Diary.panelBtn('5', '💬', 'История чата', 'Diary.show(\'chat\')') +
+            Diary.panelBtn('6', '📤', 'Экспорт', 'Diary.exportData()') +
+            Diary.panelBtn('7', '📥', 'Импорт', 'Diary.importPrompt()') +
+            '</div>';
+
+        // Кнопка консультации — появляется, когда отмечены дни
+        html += '<div class="dv-selbar" id="dv-selbar" style="display:none">' +
+            '<span id="dv-selcount">Выбрано дней: 0</span>' +
+            '<button class="btn btn-primary" onclick="Diary.askDoctor()">🩺 Отправить доктору</button>' +
+            '</div>';
+
+        // Список записей
+        if (days.length === 0) {
+            html += '<div class="empty-state">' +
+                '<div class="empty-icon">📔</div>' +
+                '<h3>' + (allDays.length === 0 ? 'Нет записей' : 'Ничего не найдено') + '</h3>' +
+                '<p>' + (allDays.length === 0
+                    ? 'Нажмите «Запись измерений», чтобы завести первую запись за день.'
+                    : 'В выбранном периоде записей нет. Измените период или сбросьте фильтр.') +
+                '</p></div>';
+        } else {
+            var pageDays = days.slice(Diary._listOffset, Diary._listOffset + 10);
+            html += '<div class="dv-list">';
+            for (var i = 0; i < pageDays.length; i++) {
+                html += Diary.listRow(records[pageDays[i]]);
+            }
+            html += '</div>';
+
+            if (days.length > 10) {
+                html += '<p class="dv-muted dv-center">Записи ' + (Diary._listOffset + 1) + '–' +
+                    Math.min(Diary._listOffset + 10, days.length) + ' из ' + days.length +
+                    '. Листайте кнопками ⬆️ ⬇️.</p>';
+            }
+        }
+
+        host.innerHTML = html;
+        Diary.updateSelBar();
+    },
+
+    listRow: function (rec) {
+        var last = Diary.lastMeasurement(rec.measurements);
+        var brief = '';
+        if (last) {
+            brief = 'Последнее: ' + UI.escapeHtml(last.time || '--:--');
+            var vals = [];
+            if (last.ad_top && last.ad_bottom) vals.push('АД ' + last.ad_top + '/' + last.ad_bottom);
+            if (last.pulse) vals.push('пульс ' + last.pulse);
+            if (last.sugar) vals.push('сахар ' + last.sugar);
+            if (last.temperature) vals.push('t° ' + last.temperature);
+            if (last.weight) vals.push('вес ' + last.weight);
+            if (vals.length) brief += ' (' + UI.escapeHtml(vals.join(', ')) + ')';
+        }
+        var count = Diary.filledCount(rec.measurements);
+        var checked = Diary._selectedDays.indexOf(rec.date) !== -1;
+
+        return '<div class="dv-item">' +
+            '<label class="dv-check">' +
+            '<input type="checkbox" ' + (checked ? 'checked' : '') +
+            ' onchange="Diary.toggleDay(\'' + rec.date + '\', this.checked)">' +
+            '<span></span></label>' +
+            '<div class="dv-item-body">' +
+            '<div class="dv-item-date">' + UI.escapeHtml(Diary.formatDay(rec.date)) +
+            ' <span class="dv-badge">' + count + Diary.plural(count, ' измерение', ' измерения', ' измерений') + '</span></div>' +
+            '<div class="dv-item-brief">' + brief + '</div>' +
+            '</div>' +
+            '<div class="dv-item-actions">' +
+            '<button class="btn btn-outline btn-small" onclick="Diary.openRecord(\'' + rec.date + '\')">Откр.</button>' +
+            '<button class="btn btn-outline btn-small" onclick="Diary.printRecord(\'' + rec.date + '\')" title="Печать / PDF">🖨️</button>' +
+            '<button class="dv-del" onclick="Diary.deleteRecord(\'' + rec.date + '\')" title="Удалить">✕</button>' +
+            '</div></div>';
+    },
+
+    panelBtn: function (num, icon, label, action, extra) {
+        return '<button class="dv-pbtn ' + (extra || '') + '" onclick="' + action + '">' +
+            '<span class="dv-pbtn-icon">' + icon + '</span>' +
+            '<span class="dv-pbtn-label">' + label + '</span></button>';
+    },
+
+    applyFilter: function (days) {
+        if (!Diary._filterFrom && !Diary._filterTo) return days;
+        return days.filter(function (d) {
+            if (Diary._filterFrom && d < Diary._filterFrom) return false;
+            if (Diary._filterTo && d > Diary._filterTo) return false;
+            return true;
+        });
+    },
+
+    togglePeriod: function () {
+        var box = document.getElementById('dv-filter');
+        if (!box) return;
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    },
+
+    applyPeriod: function () {
+        var from = document.getElementById('dv-from');
+        var to = document.getElementById('dv-to');
+        Diary._filterFrom = from ? from.value : '';
+        Diary._filterTo = to ? to.value : '';
+        if (Diary._filterFrom && Diary._filterTo && Diary._filterFrom > Diary._filterTo) {
+            UI.showToast('Дата «с» позже даты «по» — проверьте период', 3000);
+            return;
+        }
+        Diary._listOffset = 0;
+        Diary.renderList();
+    },
+
+    clearPeriod: function () {
+        Diary._filterFrom = '';
+        Diary._filterTo = '';
+        Diary._listOffset = 0;
+        Diary.renderList();
+    },
+
+    scrollList: function (dir) {
+        var records = Diary.getRecords();
+        var days = Diary.applyFilter(Object.keys(records).sort(function (a, b) { return a < b ? 1 : -1; }));
+        var next = Diary._listOffset + dir * 10;
+        if (next < 0) next = 0;
+        if (next >= days.length) next = Math.max(0, days.length - 10);
+        if (next === Diary._listOffset) {
+            UI.showToast(dir < 0 ? 'Это начало списка' : 'Это конец списка');
+            return;
+        }
+        Diary._listOffset = next;
+        Diary.renderList();
+    },
+
+    toggleDay: function (day, checked) {
+        if (checked) {
+            if (Diary._selectedDays.indexOf(day) === -1) Diary._selectedDays.push(day);
+        } else {
+            Diary._selectedDays = Diary._selectedDays.filter(function (d) { return d !== day; });
+        }
+        Diary.updateSelBar();
+    },
+
+    updateSelBar: function () {
+        var bar = document.getElementById('dv-selbar');
+        var cnt = document.getElementById('dv-selcount');
+        if (!bar) return;
+        bar.style.display = Diary._selectedDays.length > 0 ? 'flex' : 'none';
+        if (cnt) cnt.textContent = 'Выбрано дней: ' + Diary._selectedDays.length;
+    },
+
+    /* ======================================================================
+     * МАКЕТ №3 — ФОРМА ЗАПИСИ ИЗМЕРЕНИЙ
+     * ==================================================================== */
+
+    /* Открыть форму: продолжить черновик или начать новую запись */
+    openForm: function () {
+        var current = Diary.getCurrent();
+        if (current && current.date) {
+            Diary._current = current;
+        } else {
+            Diary._current = Diary.blankRecord('');
+        }
+        Diary._editingDay = null;
+        Diary._rowOffset = 0;
+        Diary._dirty = false;
+        Diary.show('form');
+    },
+
+    /* Открыть готовую запись на редактирование (кнопка «Откр.») */
+    openRecord: function (day) {
+        var records = Diary.getRecords();
+        var rec = records[day];
+        if (!rec) return;
+
+        var draft = Diary.getCurrent();
+        if (draft && draft.date && draft.date !== day && Diary.filledCount(draft.measurements) > 0) {
+            UI.showToast('Сначала завершите запись за ' + Diary.formatDay(draft.date), 3500);
+            return;
+        }
+
+        Diary._current = {
+            date: rec.date,
+            measurements: JSON.parse(JSON.stringify(rec.measurements)),
+            status: 'editing',
+            created_at: rec.created_at
+        };
+        Diary._editingDay = day;
+        Diary._rowOffset = 0;
+        Diary._dirty = false;
+        Diary.show('form');
+    },
+
+    blankRecord: function (date) {
+        return {
             date: date,
-            time: time,
-            systolic: systolic ? Number(systolic) : null,
-            diastolic: diastolic ? Number(diastolic) : null,
-            pulse: pulse ? Number(pulse) : null,
-            sugar: sugar ? Number(sugar) : null,
-            temperature: temp ? Number(temp) : null,
-            weight: weight ? Number(weight) : null,
-            notes: notes,
-            createdAt: new Date().toISOString()
+            measurements: [],
+            status: 'editing',
+            created_at: new Date().toISOString()
+        };
+    },
+
+    renderForm: function () {
+        var host = document.getElementById('diary-root');
+        if (!host) return;
+
+        var rec = Diary._current;
+        var filled = Diary.filledCount(rec.measurements);
+        // Валидация №2: дата блокируется, как только в таблице есть данные
+        var dateLocked = filled > 0;
+
+        var html = '';
+
+        html += '<div class="dv-head">' +
+            '<button class="dv-back" onclick="Diary.leaveForm()">← Назад</button>' +
+            '<h2 class="dv-title">📝 Запись измерений</h2>' +
+            '</div>';
+
+        html += '<div class="dv-daterow">' +
+            '<label for="dv-date">Дата записи</label>' +
+            '<input type="date" id="dv-date" value="' + (rec.date || '') + '"' +
+            (dateLocked ? ' data-locked="1"' : '') +
+            ' onchange="Diary.onDateChange(this)">' +
+            (dateLocked
+                ? '<span class="dv-lock">🔒 Дата заблокирована — завершите запись кнопкой «Завершить запись»</span>'
+                : '') +
+            '</div>';
+        html += '<div class="dv-err" id="dv-date-err"></div>';
+
+        html += '<div class="dv-counter">Внесено: <strong>' + filled + '</strong> из ' +
+            Diary.MAX_ROWS + ' измерений<span id="dv-savehint" class="dv-savehint"></span></div>';
+
+        html += Diary.tableHtml();
+
+        // Панель управления — 5 кнопок ТЗ
+        html += '<div class="dv-panel">' +
+            Diary.panelBtn('1', '🩺', 'Отправить доктору', 'Diary.askDoctorCurrent()') +
+            Diary.panelBtn('2', '⬆️', 'Вверх', 'Diary.scrollRows(-1)') +
+            Diary.panelBtn('3', '⬇️', 'Вниз', 'Diary.scrollRows(1)') +
+            Diary.panelBtn('4', '💾', 'Сохранить и выйти', 'Diary.saveAndExit()') +
+            Diary.panelBtn('5', '✅', 'Завершить запись', 'Diary.completeRecord()', 'dv-btn-done') +
+            '</div>';
+
+        host.innerHTML = html;
+        Diary.bindTable();
+    },
+
+    tableHtml: function () {
+        var rec = Diary._current;
+        var from = Diary._rowOffset;
+        var to = Math.min(from + Diary.VISIBLE_ROWS, Diary.MAX_ROWS);
+
+        var html = '<div class="dv-tablewrap"><table class="dv-table">' +
+            '<thead><tr>' +
+            '<th class="dv-c-num">№</th>' +
+            '<th>Время</th>' +
+            '<th>АД верх</th>' +
+            '<th>АД низ</th>' +
+            '<th>Пульс</th>' +
+            '<th>Сахар</th>' +
+            '<th>t°</th>' +
+            '<th>Вес</th>' +
+            '</tr></thead><tbody>';
+
+        for (var i = from; i < to; i++) {
+            var m = rec.measurements[i] || {};
+            html += '<tr data-row="' + i + '">' +
+                '<td class="dv-c-num">' + (i + 1) + '</td>' +
+                Diary.cell(i, 'time', m.time, 'time') +
+                Diary.cell(i, 'ad_top', m.ad_top, 'number') +
+                Diary.cell(i, 'ad_bottom', m.ad_bottom, 'number') +
+                Diary.cell(i, 'pulse', m.pulse, 'number') +
+                Diary.cell(i, 'sugar', m.sugar, 'decimal') +
+                Diary.cell(i, 'temperature', m.temperature, 'decimal') +
+                Diary.cell(i, 'weight', m.weight, 'decimal') +
+                '</tr>';
+        }
+
+        html += '</tbody></table></div>';
+        html += '<p class="dv-muted dv-center">Строки ' + (from + 1) + '–' + to +
+            ' из ' + Diary.MAX_ROWS + '. Листайте кнопками ⬆️ ⬇️.</p>';
+        html += '<div class="dv-err" id="dv-cell-err"></div>';
+        return html;
+    },
+
+    cell: function (row, field, value, kind) {
+        var attrs = 'inputmode="' + (kind === 'time' ? 'numeric' : 'decimal') + '"';
+        if (kind === 'time') {
+            attrs += ' maxlength="5" placeholder="ЧЧ:ММ"';
+        } else if (kind === 'decimal') {
+            attrs += ' maxlength="5"';
+        } else {
+            attrs += ' maxlength="3"';
+        }
+        var v = (value === null || value === undefined) ? '' : value;
+        return '<td><input type="text" class="dv-cell" data-row="' + row +
+            '" data-field="' + field + '" value="' + UI.escapeHtml(String(v)) + '" ' + attrs + '></td>';
+    },
+
+    bindTable: function () {
+        var cells = document.querySelectorAll('.dv-cell');
+        for (var i = 0; i < cells.length; i++) {
+            cells[i].addEventListener('focus', function () {
+                this.classList.add('dv-cell-active');
+            });
+            cells[i].addEventListener('blur', function () {
+                this.classList.remove('dv-cell-active');
+                Diary.commitCell(this);
+            });
+            cells[i].addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    Diary.commitCell(this);
+                    Diary.focusCell(Number(this.getAttribute('data-row')) + 1, 'time');
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    Diary.revertCell(this);
+                    this.blur();
+                }
+            });
+        }
+    },
+
+    focusCell: function (row, field) {
+        var el = document.querySelector('.dv-cell[data-row="' + row + '"][data-field="' + field + '"]');
+        if (el) { el.focus(); el.select(); }
+    },
+
+    revertCell: function (input) {
+        var row = Number(input.getAttribute('data-row'));
+        var field = input.getAttribute('data-field');
+        var m = Diary._current.measurements[row];
+        var v = m && m[field] !== null && m[field] !== undefined ? m[field] : '';
+        input.value = String(v);
+        input.classList.remove('dv-cell-err', 'dv-cell-warn');
+        Diary.showCellError('');
+    },
+
+    /* ----------------------------------------------------------------------
+     * Запись значения ячейки с полной валидацией (проверки 3–11, 12, 15, 16)
+     * -------------------------------------------------------------------- */
+    commitCell: function (input) {
+        var row = Number(input.getAttribute('data-row'));
+        var field = input.getAttribute('data-field');
+        var raw = input.value.trim();
+
+        input.classList.remove('dv-cell-err', 'dv-cell-warn');
+        Diary.showCellError('');
+
+        // Валидация №1: без даты работать нельзя
+        if (!Diary._current.date && raw !== '') {
+            Diary.showDateError('Введите дату записи');
+            input.value = '';
+            Diary.focusDate();
+            return;
+        }
+
+        var rec = Diary._current;
+        while (rec.measurements.length <= row) {
+            rec.measurements.push({
+                id: rec.measurements.length + 1,
+                time: '', ad_top: null, ad_bottom: null, pulse: null,
+                sugar: null, temperature: null, weight: null, notes: ''
+            });
+        }
+        var m = rec.measurements[row];
+
+        /* --- Время ------------------------------------------------------- */
+        if (field === 'time') {
+            if (raw === '') {
+                if (Diary.rowHasValues(m)) {
+                    // Валидация №3: время обязательно, если строка заполнена
+                    input.classList.add('dv-cell-err');
+                    Diary.showCellError('Введите СНАЧАЛА время измерения!');
+                    return;
+                }
+                m.time = '';
+                Diary.afterChange();
+                return;
+            }
+            var norm = Diary.normalizeTime(raw);
+            if (norm === null) {
+                // Валидация №10: формат HH:MM
+                input.classList.add('dv-cell-err');
+                Diary.showCellError('Формат времени: ЧЧ:ММ (например 08:00)');
+                return;
+            }
+            var hh = Number(norm.split(':')[0]);
+            var mm = Number(norm.split(':')[1]);
+            if (hh > 23 || mm > 59) {
+                // Валидация №11: корректность часов и минут
+                input.classList.add('dv-cell-err');
+                Diary.showCellError('Некорректное время (часов 0–23, минут 0–59)');
+                return;
+            }
+            m.time = norm;
+            input.value = norm;
+            Diary.afterChange();
+            return;
+        }
+
+        /* --- Числовые поля ---------------------------------------------- */
+        if (raw === '') {
+            m[field] = null;
+            Diary.afterChange();
+            return;
+        }
+
+        // Валидация №3: сначала время, потом всё остальное
+        if (!m.time) {
+            input.classList.add('dv-cell-err');
+            Diary.showCellError('Введите СНАЧАЛА время измерения!');
+            input.value = '';
+            Diary.focusCell(row, 'time');
+            return;
+        }
+
+        var num = Number(raw.replace(',', '.'));
+        // Валидация №15: только числа
+        if (raw.replace(',', '.').match(/^-?\d*\.?\d+$/) === null || isNaN(num)) {
+            input.classList.add('dv-cell-err');
+            Diary.showCellError('Введите число (без букв и специальных символов)');
+            return;
+        }
+
+        // Валидации №4–9: диапазоны значений
+        var r = Diary.RANGES[field];
+        if (r && (num < r.min || num > r.max)) {
+            input.classList.add('dv-cell-err');
+            Diary.showCellError('Диапазон ' + r.label + ': ' + r.show + ' ' + r.unit);
+            return;
+        }
+
+        m[field] = num;
+        input.value = String(num);
+
+        // Валидация №16: верхнее давление должно быть больше нижнего (предупреждение)
+        if ((field === 'ad_top' || field === 'ad_bottom') && m.ad_top && m.ad_bottom) {
+            if (m.ad_top < m.ad_bottom) {
+                input.classList.add('dv-cell-warn');
+                Diary.showCellError('Внимание: верхнее давление должно быть больше нижнего. Проверьте!', true);
+            }
+        }
+
+        // Валидация №12: лимит 36 измерений
+        if (Diary.filledCount(rec.measurements) >= Diary.MAX_ROWS) {
+            UI.showToast('Лимит 36 измерений достигнут. Завершите запись!', 3500);
+        }
+
+        Diary.afterChange();
+    },
+
+    afterChange: function () {
+        Diary._dirty = true;
+        Diary.autosave();
+        Diary.refreshCounter();
+    },
+
+    refreshCounter: function () {
+        var box = document.querySelector('.dv-counter strong');
+        if (box) box.textContent = String(Diary.filledCount(Diary._current.measurements));
+        // Как только появились данные — дата блокируется (валидация №2)
+        var dateInput = document.getElementById('dv-date');
+        if (dateInput && Diary.filledCount(Diary._current.measurements) > 0 &&
+            !dateInput.getAttribute('data-locked')) {
+            dateInput.setAttribute('data-locked', '1');
+            var row = dateInput.parentNode;
+            if (row && !row.querySelector('.dv-lock')) {
+                var hint = document.createElement('span');
+                hint.className = 'dv-lock';
+                hint.textContent = '🔒 Дата заблокирована — завершите запись кнопкой «Завершить запись»';
+                row.appendChild(hint);
+            }
+        }
+    },
+
+    onDateChange: function (input) {
+        var rec = Diary._current;
+        var newDate = input.value;
+
+        // Валидация №2: менять дату нельзя, если в таблице уже есть данные
+        if (input.getAttribute('data-locked') && rec.date && newDate !== rec.date) {
+            input.value = rec.date;
+            Diary.showDateError('Дата заблокирована! Завершите запись кнопкой «Завершить запись»');
+            return;
+        }
+
+        if (!newDate) {
+            Diary.showDateError('Введите дату записи');
+            rec.date = '';
+            return;
+        }
+
+        // Нельзя завести черновик на день, который уже завершён
+        var records = Diary.getRecords();
+        if (records[newDate] && Diary._editingDay !== newDate) {
+            input.value = rec.date || '';
+            Diary.showDateError('Запись за ' + Diary.formatDay(newDate) +
+                ' уже существует. Откройте её кнопкой «Откр.» в списке.');
+            return;
+        }
+
+        Diary.showDateError('');
+        rec.date = newDate;
+        Diary.autosave();
+    },
+
+    focusDate: function () {
+        var d = document.getElementById('dv-date');
+        if (d) d.focus();
+    },
+
+    showDateError: function (msg) {
+        var box = document.getElementById('dv-date-err');
+        if (box) {
+            box.textContent = msg ? '🩺 ' + msg : '';
+            box.style.display = msg ? 'block' : 'none';
+        }
+        if (msg) UI.showToast(msg, 3500);
+    },
+
+    showCellError: function (msg, isWarning) {
+        var box = document.getElementById('dv-cell-err');
+        if (box) {
+            box.textContent = msg ? '🩺 ' + msg : '';
+            box.style.display = msg ? 'block' : 'none';
+            box.className = 'dv-err' + (isWarning ? ' dv-err-warn' : '');
+        }
+        if (msg) UI.showToast(msg, 3500);
+    },
+
+    updateSaveHint: function (text) {
+        var el = document.getElementById('dv-savehint');
+        if (!el) return;
+        el.textContent = ' · ' + text;
+        clearTimeout(Diary._hintTimer);
+        Diary._hintTimer = setTimeout(function () {
+            var e2 = document.getElementById('dv-savehint');
+            if (e2) e2.textContent = '';
+        }, 2000);
+    },
+    _hintTimer: null,
+
+    scrollRows: function (dir) {
+        var next = Diary._rowOffset + dir * Diary.VISIBLE_ROWS;
+        if (next < 0) next = 0;
+        if (next >= Diary.MAX_ROWS) next = Diary.MAX_ROWS - Diary.VISIBLE_ROWS;
+        if (next === Diary._rowOffset) {
+            UI.showToast(dir < 0 ? 'Это первая строка' : 'Это последняя строка');
+            return;
+        }
+        Diary._rowOffset = next;
+        Diary.renderForm();
+    },
+
+    /* --- Кнопка №4: сохранить черновик и выйти ---------------------------- */
+    saveAndExit: function () {
+        var rec = Diary._current;
+        if (!rec.date) {
+            Diary.showDateError('Введите дату записи');
+            Diary.focusDate();
+            return;
+        }
+
+        if (Diary._editingDay) {
+            // Редактирование готовой записи — сохраняем прямо в неё
+            Diary.commitEdit(false);
+            return;
+        }
+
+        Diary.saveCurrent(rec);
+        Diary._dirty = false;
+        UI.showToast('Сохранено!');
+        Diary.show('list');
+    },
+
+    /* --- Кнопка №5: завершить запись -------------------------------------- */
+    completeRecord: function () {
+        var rec = Diary._current;
+
+        // Валидация №1
+        if (!rec.date) {
+            Diary.showDateError('Введите дату записи');
+            Diary.focusDate();
+            return;
+        }
+
+        // Валидация №13: нельзя завершить пустую запись
+        var rows = Diary.validRows(rec.measurements);
+        if (rows.length === 0) {
+            UI.showToast('Нет данных для сохранения. Введите хотя бы одно измерение', 3500);
+            return;
+        }
+
+        // Сортировка по времени (требование ТЗ, раздел 7.2)
+        rows.sort(function (a, b) { return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0); });
+        for (var i = 0; i < rows.length; i++) rows[i].id = i + 1;
+
+        var records = Diary.getRecords();
+        var existing = records[rec.date];
+
+        records[rec.date] = {
+            date: rec.date,
+            measurements: rows,
+            completed: true,
+            created_at: (existing && existing.created_at) || rec.created_at || new Date().toISOString(),
+            completed_at: new Date().toISOString()
+        };
+        Diary.saveRecords(records);
+
+        if (!Diary._editingDay) {
+            Diary.saveCurrent(null);   // черновик очищается
+        }
+        Diary._current = null;
+        Diary._editingDay = null;
+        Diary._dirty = false;
+
+        UI.showToast('Запись завершена и сохранена!');
+        Diary.show('list');
+
+        // Печать записи (PDF через браузер) — после возврата в список
+        setTimeout(function () { Diary.printRecord(records[rec.date].date); }, 400);
+    },
+
+    /* Сохранение при редактировании готовой записи */
+    commitEdit: function (silent) {
+        var rec = Diary._current;
+        var rows = Diary.validRows(rec.measurements);
+        if (rows.length === 0) {
+            UI.showToast('Нет данных для сохранения. Введите хотя бы одно измерение', 3500);
+            return;
+        }
+        rows.sort(function (a, b) { return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0); });
+        for (var i = 0; i < rows.length; i++) rows[i].id = i + 1;
+
+        var records = Diary.getRecords();
+        records[rec.date].measurements = rows;
+        records[rec.date].completed_at = new Date().toISOString();
+        Diary.saveRecords(records);
+
+        Diary._current = null;
+        Diary._editingDay = null;
+        Diary._dirty = false;
+        if (!silent) UI.showToast('Сохранено!');
+        Diary.show('list');
+    },
+
+    /* Выход из формы кнопкой «Назад» — валидация №14 */
+    leaveForm: function () {
+        if (Diary._dirty) {
+            UI.showConfirm(
+                'Есть несохранённые данные!',
+                'Используйте «Сохранить и выйти» или «Завершить запись». Выйти без сохранения?',
+                'Выйти',
+                function () {
+                    Diary._dirty = false;
+                    Diary._current = null;
+                    Diary._editingDay = null;
+                    Diary.show('list');
+                }
+            );
+            return;
+        }
+        Diary._current = null;
+        Diary._editingDay = null;
+        Diary.show('list');
+    },
+
+    deleteRecord: function (day) {
+        UI.showConfirm(
+            'Удалить запись?',
+            'Запись за ' + Diary.formatDay(day) + ' будет удалена. Это действие нельзя отменить.',
+            'Удалить',
+            function () {
+                var records = Diary.getRecords();
+                delete records[day];
+                Diary.saveRecords(records);
+                Diary._selectedDays = Diary._selectedDays.filter(function (d) { return d !== day; });
+                UI.showToast('Запись удалена!');
+                Diary.renderList();
+            }
+        );
+    },
+
+    /* ======================================================================
+     * КОНСУЛЬТАЦИЯ CLAUDE
+     * ==================================================================== */
+
+    /* Из Макета №2 — по отмеченным дням */
+    askDoctor: function () {
+        if (Diary._selectedDays.length === 0) {
+            UI.showToast('Отметьте галочками дни для консультации');
+            return;
+        }
+        var days = Diary._selectedDays.slice().sort();
+        var records = Diary.getRecords();
+        var payload = [];
+        for (var i = 0; i < days.length; i++) {
+            if (records[days[i]]) payload.push(records[days[i]]);
+        }
+        Diary.sendConsult(payload, days);
+    },
+
+    /* Из Макета №3 — по текущей записи */
+    askDoctorCurrent: function () {
+        var rec = Diary._current;
+        if (!rec || !rec.date) {
+            Diary.showDateError('Введите дату записи');
+            return;
+        }
+        var rows = Diary.validRows(rec.measurements);
+        if (rows.length === 0) {
+            UI.showToast('Введите хотя бы одно измерение');
+            return;
+        }
+        rows.sort(function (a, b) { return a.time < b.time ? -1 : 1; });
+        Diary.sendConsult([{ date: rec.date, measurements: rows }], [rec.date]);
+    },
+
+    sendConsult: function (records, days) {
+        if (Diary._sending) {
+            UI.showToast('Запрос уже отправлен, подождите');
+            return;
+        }
+        if (!navigator.onLine) {
+            UI.showToast('Нет соединения с интернетом', 3500);
+            return;
+        }
+
+        var dayLabels = days.map(function (d) { return Diary.formatDay(d); }).join(', ');
+
+        UI.showConfirm(
+            'Отправить доктору?',
+            'Данные за ' + dayLabels + ' будут отправлены ИИ-доктору для анализа.',
+            'Отправить',
+            function () {
+                Diary._sending = true;
+                UI.showToast('Отправляю запрос доктору...', 4000);
+
+                var prompt = Diary.buildPrompt(records);
+
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/chat', true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.timeout = 90000;   // запас на длинные заключения
+
+                xhr.onload = function () {
+                    Diary._sending = false;
+                    if (xhr.status === 200) {
+                        var data;
+                        try {
+                            data = JSON.parse(xhr.responseText);
+                        } catch (e) {
+                            UI.showToast('Ошибка обработки ответа сервера', 3500);
+                            return;
+                        }
+                        var reply = (data.reply || '').replace('[ПРОДОЛЖЕНИЕ]', '').trim();
+                        if (!reply) {
+                            UI.showToast('Доктор не прислал ответ, попробуйте ещё раз', 3500);
+                            return;
+                        }
+                        Diary.storeConsult(days, prompt, reply);
+                        Diary._selectedDays = [];
+                        UI.showToast('Ответ получен! Смотрите историю консультаций', 4000);
+                        Diary.show('chat');
+                    } else if (xhr.status === 403) {
+                        UI.showToast('Нужен код доступа к доктору — откройте раздел «Доктор»', 4000);
+                    } else if (xhr.status === 429) {
+                        UI.showToast('Слишком много запросов, подождите немного', 3500);
+                    } else if (xhr.status === 401) {
+                        UI.showToast('Ошибка авторизации API (проверьте ключ)', 3500);
+                    } else {
+                        UI.showToast('Ошибка сервера Claude (код ' + xhr.status + ')', 3500);
+                    }
+                };
+
+                xhr.ontimeout = function () {
+                    Diary._sending = false;
+                    UI.showToast('Сервер не ответил, попробуйте позже', 3500);
+                };
+
+                xhr.onerror = function () {
+                    Diary._sending = false;
+                    UI.showToast('Нет соединения с интернетом', 3500);
+                };
+
+                xhr.send(JSON.stringify({
+                    message: prompt,
+                    history: [],
+                    profileContext: Doctor.getProfileContext(),
+                    analysesContext: '',
+                    files: [],
+                    accessCode: localStorage.getItem('hd_access_code') || ''
+                }));
+            }
+        );
+    },
+
+    /* Формирование текста запроса (раздел 5.1 ТЗ) */
+    buildPrompt: function (records) {
+        var lines = ['ДНЕВНИК ЗДОРОВЬЯ:', ''];
+
+        for (var i = 0; i < records.length; i++) {
+            var rec = records[i];
+            lines.push(Diary.formatDay(rec.date).toUpperCase() + ':');
+            var rows = Diary.validRows(rec.measurements);
+            rows.sort(function (a, b) { return a.time < b.time ? -1 : 1; });
+            for (var j = 0; j < rows.length; j++) {
+                var m = rows[j];
+                var parts = [];
+                if (m.ad_top && m.ad_bottom) parts.push('АД ' + m.ad_top + '/' + m.ad_bottom);
+                if (m.pulse) parts.push('Пульс ' + m.pulse);
+                if (m.sugar) parts.push('Сахар ' + m.sugar);
+                if (m.temperature) parts.push('t° ' + m.temperature);
+                if (m.weight) parts.push('Вес ' + m.weight + ' кг');
+                lines.push(m.time + ' — ' + parts.join(', '));
+            }
+            lines.push('');
+        }
+
+        lines.push('Вопрос: Как вы оцениваете эти показатели? Есть ли рекомендации?');
+        return lines.join('\n');
+    },
+
+    storeConsult: function (days, prompt, reply) {
+        var chat = Diary.getChat();
+        chat.unshift({
+            id: 'msg_' + Date.now().toString(36),
+            timestamp: new Date().toISOString(),
+            selected_days: days.slice(),
+            user_message: 'Отправлен дневник за ' + days.map(function (d) {
+                return Diary.formatDay(d);
+            }).join(', '),
+            prompt: prompt,
+            ai_response: reply,
+            model: 'claude-haiku-4-5'
+        });
+        if (chat.length > 100) chat = chat.slice(0, 100);
+        Diary.saveChat(chat);
+    },
+
+    /* ======================================================================
+     * МАКЕТ №4 — ИСТОРИЯ КОНСУЛЬТАЦИЙ
+     * ==================================================================== */
+    renderChat: function () {
+        var host = document.getElementById('diary-root');
+        if (!host) return;
+
+        var chat = Diary.getChat();
+        var html = '';
+
+        html += '<div class="dv-head">' +
+            '<button class="dv-back" onclick="Diary.show(\'list\')">← Назад</button>' +
+            '<h2 class="dv-title">💬 История консультаций</h2>' +
+            '</div>';
+
+        if (chat.length === 0) {
+            html += '<div class="empty-state">' +
+                '<div class="empty-icon">💬</div>' +
+                '<h3>Консультаций пока нет</h3>' +
+                '<p>Отметьте дни в списке записей и нажмите «Отправить доктору».</p>' +
+                '</div>';
+            host.innerHTML = html;
+            return;
+        }
+
+        for (var i = 0; i < chat.length; i++) {
+            var c = chat[i];
+            var when = Diary.formatStamp(c.timestamp);
+            var daysText = (c.selected_days || []).map(function (d) {
+                return Diary.formatDay(d);
+            }).join(', ');
+
+            html += '<div class="dv-msg">';
+            html += '<div class="dv-msg-user">' +
+                '<div class="dv-msg-who">🧑 Вы · ' + UI.escapeHtml(when) + '</div>' +
+                '<div class="dv-msg-days">Отправлены дни: ' + UI.escapeHtml(daysText) + '</div>' +
+                '</div>';
+            html += '<div class="dv-msg-ai">' +
+                '<div class="dv-msg-who">🩺 Доктор</div>' +
+                '<div class="dv-msg-text">' + Diary.formatReply(c.ai_response) + '</div>' +
+                '</div>';
+            html += '<div class="dv-msg-actions">' +
+                '<button class="btn btn-outline btn-small" onclick="Diary.copyConsult(\'' + c.id + '\')">📋 Копировать</button>' +
+                '<button class="btn btn-outline btn-small" onclick="Diary.printConsult(\'' + c.id + '\')">🖨️ Печать</button>' +
+                '<button class="btn btn-outline btn-small" onclick="Diary.printConsult(\'' + c.id + '\')">📄 PDF</button>' +
+                '<button class="dv-del" onclick="Diary.deleteConsult(\'' + c.id + '\')" title="Удалить">✕</button>' +
+                '</div>';
+            html += '</div>';
+        }
+
+        host.innerHTML = html;
+    },
+
+    findConsult: function (id) {
+        var chat = Diary.getChat();
+        for (var i = 0; i < chat.length; i++) {
+            if (chat[i].id === id) return chat[i];
+        }
+        return null;
+    },
+
+    copyConsult: function (id) {
+        var c = Diary.findConsult(id);
+        if (!c) return;
+        var text = c.ai_response;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                UI.showToast('Скопировано в буфер обмена');
+            }).catch(function () {
+                Diary.fallbackCopy(text);
+            });
+        } else {
+            Diary.fallbackCopy(text);
+        }
+    },
+
+    fallbackCopy: function (text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand('copy');
+            UI.showToast('Скопировано в буфер обмена');
+        } catch (e) {
+            UI.showToast('Не удалось скопировать');
+        }
+        document.body.removeChild(ta);
+    },
+
+    printConsult: function (id) {
+        var c = Diary.findConsult(id);
+        if (!c) return;
+        var days = (c.selected_days || []).map(function (d) { return Diary.formatDay(d); }).join(', ');
+        var body = '<h2>Консультация ИИ-доктора</h2>' +
+            '<p><strong>Дата консультации:</strong> ' + UI.escapeHtml(Diary.formatStamp(c.timestamp)) + '</p>' +
+            '<p><strong>Данные за:</strong> ' + UI.escapeHtml(days) + '</p><hr>' +
+            Diary.formatReply(c.ai_response);
+        Diary.printDocument('Консультация — ' + days, body);
+    },
+
+    deleteConsult: function (id) {
+        UI.showConfirm('Удалить консультацию?', 'Запись из истории будет удалена.', 'Удалить', function () {
+            var chat = Diary.getChat().filter(function (c) { return c.id !== id; });
+            Diary.saveChat(chat);
+            UI.showToast('Консультация удалена');
+            Diary.renderChat();
+        });
+    },
+
+    /* ======================================================================
+     * ПЕЧАТЬ / PDF (через браузер — «Сохранить как PDF»)
+     * ==================================================================== */
+    printRecord: function (day) {
+        var records = Diary.getRecords();
+        var rec = records[day];
+        if (!rec) return;
+
+        var rows = Diary.validRows(rec.measurements);
+        rows.sort(function (a, b) { return a.time < b.time ? -1 : 1; });
+
+        var body = '<h2>Дневник здоровья за ' + UI.escapeHtml(Diary.formatDay(day)) + '</h2>';
+        body += '<table class="grid"><tr>' +
+            '<th>№</th><th>Время</th><th>АД верх</th><th>АД низ</th>' +
+            '<th>Пульс</th><th>Сахар</th><th>t°</th><th>Вес</th></tr>';
+        for (var i = 0; i < rows.length; i++) {
+            var m = rows[i];
+            body += '<tr>' +
+                '<td>' + (i + 1) + '</td>' +
+                '<td>' + UI.escapeHtml(m.time || '') + '</td>' +
+                '<td>' + Diary.cellText(m.ad_top) + '</td>' +
+                '<td>' + Diary.cellText(m.ad_bottom) + '</td>' +
+                '<td>' + Diary.cellText(m.pulse) + '</td>' +
+                '<td>' + Diary.cellText(m.sugar) + '</td>' +
+                '<td>' + Diary.cellText(m.temperature) + '</td>' +
+                '<td>' + Diary.cellText(m.weight) + '</td>' +
+                '</tr>';
+        }
+        body += '</table>';
+        body += '<p><strong>Всего измерений:</strong> ' + rows.length + '</p>';
+
+        Diary.printDocument('Дневник — ' + Diary.formatDay(day), body);
+    },
+
+    cellText: function (v) {
+        return (v === null || v === undefined || v === '') ? '—' : String(v);
+    },
+
+    printDocument: function (title, bodyHtml) {
+        var profileCtx = (typeof Doctor !== 'undefined' && Doctor.getProfileContext)
+            ? Doctor.getProfileContext() : '';
+        var today = new Date().toLocaleDateString('ru-RU');
+
+        var html = '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">' +
+            '<title>' + UI.escapeHtml(title) + '</title><style>' +
+            'body{font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:30px;' +
+            'color:#222;font-size:14px;line-height:1.6}' +
+            '.header{text-align:center;border-bottom:2px solid #0066CC;padding-bottom:16px;margin-bottom:24px}' +
+            '.header h1{color:#0066CC;margin:0;font-size:22px}' +
+            '.header p{margin:4px 0;color:#666;font-size:13px}' +
+            '.patient-info{background:#E6F2FF;padding:12px 16px;border-radius:8px;margin-bottom:20px;font-size:13px}' +
+            'h2{color:#0066CC;font-size:18px;margin-top:20px}' +
+            'h3{color:#0D47A1;font-size:15px;margin-top:16px}' +
+            'table.grid{width:100%;border-collapse:collapse;margin:14px 0;font-size:12px}' +
+            'table.grid th{background:#0066CC;color:#fff;border:1px solid #CCC;padding:7px 6px;text-align:center}' +
+            'table.grid td{border:1px solid #CCC;padding:6px;text-align:center}' +
+            'table.grid tr:nth-child(even) td{background:#F9F9F9}' +
+            'tr{page-break-inside:avoid;break-inside:avoid}' +
+            'p{margin:6px 0}hr{border:none;border-top:1px solid #ddd;margin:16px 0}' +
+            '.footer{text-align:center;margin-top:30px;padding-top:16px;border-top:1px solid #ddd;' +
+            'color:#999;font-size:11px}' +
+            '@media print{body{padding:14px}}' +
+            '</style></head><body>' +
+            '<div class="header"><h1>🩺 Мой домашний доктор</h1>' +
+            '<p>' + UI.escapeHtml(title) + ' · документ от ' + today + '</p></div>' +
+            (profileCtx ? '<div class="patient-info">' + UI.escapeHtml(profileCtx).replace(/\n/g, '<br>') + '</div>' : '') +
+            bodyHtml +
+            '<div class="footer">Документ носит справочный характер и не является медицинским заключением.<br>' +
+            'Для постановки диагноза обратитесь к врачу.</div>' +
+            '</body></html>';
+
+        var w = window.open('', '_blank');
+        if (!w) {
+            UI.showToast('Разрешите всплывающие окна для печати', 4000);
+            return;
+        }
+        w.document.write(html);
+        w.document.close();
+        w.focus();
+        w.print();
+        UI.showToast('Для сохранения в PDF выберите принтер «Сохранить как PDF»', 5000);
+    },
+
+    /* ======================================================================
+     * ЭКСПОРТ / ИМПОРТ (синхронизация между устройствами)
+     * ==================================================================== */
+    exportData: function () {
+        var payload = {
+            export_metadata: {
+                version: '2.1',
+                exported_at: new Date().toISOString(),
+                device: navigator.userAgent,
+                app_version: '2.1.0'
+            },
+            profile: Storage.getProfiles(),
+            diary: Diary.getRecords(),
+            diary_current: Diary.getCurrent(),
+            chat: Diary.getChat(),
+            doctor_chat: Diary._read(Doctor.HISTORY_KEY, []),
+            settings: Diary.getSettings()
         };
 
-        var entries = Diary.getEntries();
-        var wasEditing = !!Diary._editingId;
-        if (Diary._editingId) {
-            for (var k = 0; k < entries.length; k++) {
-                if (entries[k].id === Diary._editingId) {
-                    entry.id = Diary._editingId;
-                    entry.createdAt = entries[k].createdAt;
-                    entries[k] = entry;
-                    break;
+        var json = JSON.stringify(payload, null, 2);
+        var blob = new Blob([json], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'family_profile_' + new Date().toISOString().split('T')[0] + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+
+        UI.showToast('Экспорт готов! Файл загружается...', 3000);
+    },
+
+    importPrompt: function () {
+        var input = document.getElementById('dv-import-file');
+        if (input) input.click();
+    },
+
+    handleImportFile: function (input) {
+        if (!input.files || input.files.length === 0) return;
+        var file = input.files[0];
+        var reader = new FileReader();
+
+        reader.onload = function (e) {
+            var data;
+            try {
+                data = JSON.parse(e.target.result);
+            } catch (err) {
+                UI.showToast('Неверный формат файла — это не файл дневника', 4000);
+                input.value = '';
+                return;
+            }
+
+            // Валидация структуры
+            if (!data || (!data.diary && !data.profile && !data.chat)) {
+                UI.showToast('Неверный формат файла — нет данных дневника', 4000);
+                input.value = '';
+                return;
+            }
+
+            var summary = [];
+            if (data.diary) summary.push(Object.keys(data.diary).length + Diary.plural(
+                Object.keys(data.diary).length, ' запись', ' записи', ' записей'));
+            if (data.chat) summary.push(data.chat.length + Diary.plural(
+                data.chat.length, ' консультация', ' консультации', ' консультаций'));
+            if (data.profile) summary.push(data.profile.length + Diary.plural(
+                data.profile.length, ' профиль', ' профиля', ' профилей'));
+
+            UI.showConfirm(
+                'Это перезапишет текущие данные!',
+                'В файле: ' + summary.join(', ') + '. Продолжить восстановление?',
+                'Восстановить',
+                function () {
+                    if (data.profile) Storage.saveProfiles(data.profile);
+                    if (data.diary) Diary.saveRecords(data.diary);
+                    if (data.chat) Diary.saveChat(data.chat);
+                    if (data.settings) Diary.saveSettings(data.settings);
+                    if (data.diary_current) {
+                        Diary.saveCurrent(data.diary_current);
+                    } else {
+                        Diary.saveCurrent(null);
+                    }
+                    if (data.doctor_chat) {
+                        localStorage.setItem(Doctor.HISTORY_KEY, JSON.stringify(data.doctor_chat));
+                    }
+                    UI.showToast('Данные восстановлены! Перезагружаю...', 2000);
+                    setTimeout(function () { location.reload(); }, 1200);
                 }
-            }
-            Diary._editingId = null;
-        } else {
-            entries.unshift(entry);
-            if (entries.length > 200) {
-                entries = entries.slice(0, 200);
-            }
-        }
-        Diary.saveEntries(entries);
+            );
+            input.value = '';
+        };
 
-        Diary.hideForm();
-        Diary.renderEntries();
-        UI.showToast(wasEditing ? 'Запись обновлена' : 'Запись добавлена');
+        reader.onerror = function () {
+            UI.showToast('Не удалось прочитать файл', 3500);
+            input.value = '';
+        };
+
+        reader.readAsText(file);
     },
 
-    updateProfileSelect: function () {
-        var select = document.getElementById('diary-profile');
-        if (!select) return;
+    /* ======================================================================
+     * ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+     * ==================================================================== */
 
-        var profiles = Storage.getProfiles();
-        select.innerHTML = '<option value="">Все члены семьи</option>';
-        for (var i = 0; i < profiles.length; i++) {
-            var opt = document.createElement('option');
-            opt.value = profiles[i].id;
-            opt.textContent = profiles[i].name;
-            select.appendChild(opt);
-        }
-
-        if (Diary.currentProfile) {
-            select.value = Diary.currentProfile;
-        }
+    /* Строка считается заполненной, если есть время и хотя бы один показатель */
+    rowHasValues: function (m) {
+        if (!m) return false;
+        return !!(m.ad_top || m.ad_bottom || m.pulse || m.sugar || m.temperature || m.weight);
     },
 
-    renderEntries: function () {
-        var container = document.getElementById('diary-entries');
-        if (!container) return;
-
-        Diary.updateProfileSelect();
-
-        var entries = Diary.getEntries();
-        if (Diary.currentProfile) {
-            entries = entries.filter(function (e) {
-                return e.profileId === Diary.currentProfile;
-            });
+    filledCount: function (list) {
+        if (!list) return 0;
+        var n = 0;
+        for (var i = 0; i < list.length; i++) {
+            if (Diary.rowHasValues(list[i])) n++;
         }
-
-        if (entries.length === 0) {
-            container.innerHTML =
-                '<div class="empty-state">' +
-                '<div class="empty-icon">📋</div>' +
-                '<h3>Нет записей</h3>' +
-                '<p>Добавьте первое измерение, нажав кнопку «Добавить запись».</p>' +
-                '</div>';
-            return;
-        }
-
-        var html = '<div class="diary-batch-bar" id="diary-batch-bar" style="display:none;">' +
-            '<span id="diary-batch-count">Выбрано: 0</span>' +
-            '<div class="diary-batch-buttons">' +
-            '<button class="btn btn-primary btn-small" onclick="Diary.askDoctorBatch()">🩺 Отправить доктору</button>' +
-            '<button class="btn btn-outline btn-small" onclick="Diary.saveToFileBatch()">💾 Файл</button>' +
-            '</div></div>';
-        for (var i = 0; i < entries.length; i++) {
-            var e = entries[i];
-            var profile = e.profileId ? Storage.getProfileById(e.profileId) : null;
-            var profileName = profile ? profile.name : '';
-            var checked = Diary._selectedIds.indexOf(e.id) !== -1;
-
-            html += '<div class="diary-entry">';
-            html += '<div class="diary-entry-header">';
-            html += '<label class="diary-checkbox"><input type="checkbox" ' + (checked ? 'checked' : '') +
-                ' onchange="Diary.toggleSelect(\'' + e.id + '\', this.checked)"><span class="checkmark"></span></label>';
-            html += '<span class="diary-entry-date">' + UI.escapeHtml(Diary.formatDate(e.date)) + ' ' + UI.escapeHtml(e.time || '') + '</span>';
-            if (profileName) {
-                html += '<span class="diary-entry-profile">' + UI.escapeHtml(profileName) + '</span>';
-            }
-            html += '<button class="diary-delete-btn" data-id="' + e.id + '" title="Удалить">✕</button>';
-            html += '</div>';
-            html += '<div class="diary-entry-values">';
-
-            if (e.systolic && e.diastolic) {
-                var bpClass = Diary.bpClass(e.systolic, e.diastolic);
-                html += '<div class="diary-value ' + bpClass + '"><span class="diary-value-label">АД</span><span class="diary-value-num">' + e.systolic + '/' + e.diastolic + '</span></div>';
-            }
-            if (e.pulse) {
-                html += '<div class="diary-value"><span class="diary-value-label">Пульс</span><span class="diary-value-num">' + e.pulse + '</span></div>';
-            }
-            if (e.sugar) {
-                html += '<div class="diary-value"><span class="diary-value-label">Сахар</span><span class="diary-value-num">' + e.sugar + '</span></div>';
-            }
-            if (e.temperature) {
-                var tempClass = e.temperature >= 37.1 ? 'diary-value-warn' : '';
-                html += '<div class="diary-value ' + tempClass + '"><span class="diary-value-label">t°</span><span class="diary-value-num">' + e.temperature + '</span></div>';
-            }
-            if (e.weight) {
-                html += '<div class="diary-value"><span class="diary-value-label">Вес</span><span class="diary-value-num">' + e.weight + ' кг</span></div>';
-            }
-
-            html += '</div>';
-            if (e.notes) {
-                html += '<div class="diary-entry-notes">' + UI.escapeHtml(e.notes) + '</div>';
-            }
-            html += '<div class="diary-entry-actions">' +
-                '<button class="btn btn-outline btn-small" onclick="Diary.editEntry(\'' + e.id + '\')">✏️ Редакт.</button>' +
-                '</div>';
-            html += '</div>';
-        }
-
-        container.innerHTML = html;
-
-        var delBtns = container.querySelectorAll('.diary-delete-btn');
-        for (var j = 0; j < delBtns.length; j++) {
-            delBtns[j].addEventListener('click', function () {
-                var id = this.getAttribute('data-id');
-                UI.showConfirm('Удалить запись?', 'Это действие нельзя отменить.', 'Удалить', function () {
-                    var all = Diary.getEntries();
-                    var filtered = all.filter(function (e) { return e.id !== id; });
-                    Diary.saveEntries(filtered);
-                    Diary.renderEntries();
-                    UI.showToast('Запись удалена');
-                });
-            });
-        }
+        return n;
     },
 
-    bpClass: function (sys, dia) {
-        if (sys >= 180 || dia >= 110) return 'diary-value-danger';
-        if (sys >= 140 || dia >= 90) return 'diary-value-warn';
-        return '';
+    /* Строки, годные для сохранения: есть время и хотя бы один показатель */
+    validRows: function (list) {
+        var out = [];
+        if (!list) return out;
+        for (var i = 0; i < list.length; i++) {
+            var m = list[i];
+            if (m && m.time && Diary.rowHasValues(m)) {
+                out.push(JSON.parse(JSON.stringify(m)));
+            }
+        }
+        return out;
     },
 
+    lastMeasurement: function (list) {
+        var rows = Diary.validRows(list);
+        if (rows.length === 0) return null;
+        rows.sort(function (a, b) { return a.time < b.time ? -1 : 1; });
+        return rows[rows.length - 1];
+    },
+
+    /* Приводит ввод к формату ЧЧ:ММ. Понимает «8:00», «0800», «08.00» */
+    normalizeTime: function (raw) {
+        var s = raw.replace(/[.\-\s]/g, ':');
+        if (s.match(/^\d{3,4}$/)) {
+            s = s.length === 3 ? '0' + s : s;
+            s = s.substring(0, 2) + ':' + s.substring(2);
+        }
+        var parts = s.split(':');
+        if (parts.length !== 2) return null;
+        if (!parts[0].match(/^\d{1,2}$/) || !parts[1].match(/^\d{1,2}$/)) return null;
+        var hh = parts[0].length === 1 ? '0' + parts[0] : parts[0];
+        var mm = parts[1].length === 1 ? '0' + parts[1] : parts[1];
+        if (!(hh + ':' + mm).match(/^\d{2}:\d{2}$/)) return null;
+        return hh + ':' + mm;
+    },
+
+    formatDay: function (day) {
+        if (!day) return '';
+        return UI.formatDate(day);
+    },
+
+    /* Короткий формат ДД.ММ.ГГГГ — используется также в разделе «Анализы» */
     formatDate: function (dateStr) {
         if (!dateStr) return '';
         var parts = dateStr.split('-');
@@ -253,172 +1441,61 @@ var Diary = {
         return parts[2] + '.' + parts[1] + '.' + parts[0];
     },
 
-    _editingId: null,
-
-    editEntry: function (id) {
-        var entries = Diary.getEntries();
-        var entry = null;
-        for (var i = 0; i < entries.length; i++) {
-            if (entries[i].id === id) { entry = entries[i]; break; }
-        }
-        if (!entry) return;
-
-        Diary._editingId = id;
-        Diary.showForm();
-        document.getElementById('entry-date').value = entry.date || '';
-        document.getElementById('entry-time').value = entry.time || '';
-        document.getElementById('entry-systolic').value = entry.systolic || '';
-        document.getElementById('entry-diastolic').value = entry.diastolic || '';
-        document.getElementById('entry-pulse').value = entry.pulse || '';
-        document.getElementById('entry-sugar').value = entry.sugar || '';
-        document.getElementById('entry-temp').value = entry.temperature || '';
-        document.getElementById('entry-weight').value = entry.weight || '';
-        document.getElementById('entry-notes').value = entry.notes || '';
+    formatStamp: function (iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        return d.toLocaleDateString('ru-RU') + ' ' +
+            String(d.getHours()).padStart(2, '0') + ':' +
+            String(d.getMinutes()).padStart(2, '0');
     },
 
-    _formatEntryText: function (e) {
-        var profile = e.profileId ? Storage.getProfileById(e.profileId) : null;
-        var lines = [];
-        lines.push('Дата: ' + Diary.formatDate(e.date) + ' ' + (e.time || ''));
-        if (profile) lines.push('Пациент: ' + profile.name);
-        if (e.systolic && e.diastolic) lines.push('Давление: ' + e.systolic + '/' + e.diastolic + ' мм рт.ст.');
-        if (e.pulse) lines.push('Пульс: ' + e.pulse + ' уд/мин');
-        if (e.sugar) lines.push('Сахар крови: ' + e.sugar + ' ммоль/л');
-        if (e.temperature) lines.push('Температура: ' + e.temperature + '°C');
-        if (e.weight) lines.push('Вес: ' + e.weight + ' кг');
-        if (e.notes) lines.push('Заметки: ' + e.notes);
-        return lines.join('\n');
+    plural: function (n, one, few, many) {
+        var lastTwo = n % 100;
+        var lastOne = n % 10;
+        if (lastTwo >= 11 && lastTwo <= 19) return many;
+        if (lastOne === 1) return one;
+        if (lastOne >= 2 && lastOne <= 4) return few;
+        return many;
     },
 
-    toggleSelect: function (id, checked) {
-        if (checked) {
-            if (Diary._selectedIds.indexOf(id) === -1) Diary._selectedIds.push(id);
-        } else {
-            Diary._selectedIds = Diary._selectedIds.filter(function (x) { return x !== id; });
-        }
-        var bar = document.getElementById('diary-batch-bar');
-        var count = document.getElementById('diary-batch-count');
-        if (bar) bar.style.display = Diary._selectedIds.length > 0 ? 'flex' : 'none';
-        if (count) count.textContent = 'Выбрано: ' + Diary._selectedIds.length;
-    },
+    /* Простое оформление ответа доктора: заголовки, списки, жирный текст */
+    formatReply: function (text) {
+        if (!text) return '';
+        var lines = String(text).split('\n');
+        var html = '';
+        var inList = false;
 
-    _formatEntryShort: function (e) {
-        var parts = [Diary.formatDate(e.date) + ' ' + (e.time || '')];
-        if (e.systolic && e.diastolic) parts.push('АД ' + e.systolic + '/' + e.diastolic);
-        if (e.pulse) parts.push('пульс ' + e.pulse);
-        if (e.sugar) parts.push('сахар ' + e.sugar);
-        if (e.temperature) parts.push('t° ' + e.temperature);
-        if (e.weight) parts.push('вес ' + e.weight);
-        if (e.notes) parts.push('(' + e.notes + ')');
-        return parts.join(' | ');
-    },
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            var trimmed = line.trim();
 
-    askDoctorBatch: function () {
-        if (Diary._selectedIds.length === 0) return;
-        var entries = Diary.getEntries();
-        var selected = [];
-        for (var i = 0; i < entries.length; i++) {
-            if (Diary._selectedIds.indexOf(entries[i].id) !== -1) selected.push(entries[i]);
-        }
-        selected.sort(function (a, b) { return (a.date + a.time) < (b.date + b.time) ? -1 : 1; });
-
-        var profile = selected[0].profileId ? Storage.getProfileById(selected[0].profileId) : null;
-        var text = 'Проанализируйте динамику показателей здоровья';
-        if (profile) text += ' пациента ' + profile.name;
-        text += ' (' + selected.length + ' измерений):\n\n';
-        for (var j = 0; j < selected.length; j++) {
-            text += Diary._formatEntryShort(selected[j]) + '\n';
-        }
-
-        Diary._selectedIds = [];
-        App.navigateTo('doctor');
-        var input = document.getElementById('chat-input');
-        if (input) {
-            input.value = text;
-            input.focus();
-        }
-    },
-
-    saveToFileBatch: function () {
-        if (Diary._selectedIds.length === 0) return;
-        var ids = Diary._selectedIds.slice();
-        var total = ids.length;
-        var saved = 0;
-        UI.showToast('Сохранение ' + total + ' файлов PDF...');
-
-        function saveNext() {
-            if (saved >= ids.length) {
-                UI.showToast('Сохранено ' + total + ' файлов PDF');
-                return;
+            if (trimmed === '') {
+                if (inList) { html += '</ul>'; inList = false; }
+                continue;
             }
-            Diary.saveToFile(ids[saved]).then(function () {
-                saved++;
-                saveNext();
-            });
+
+            if (trimmed.match(/^#{1,4}\s/)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                var text2 = UI.escapeHtml(trimmed.replace(/^#{1,4}\s/, ''));
+                html += '<h3>' + text2 + '</h3>';
+                continue;
+            }
+
+            if (trimmed.match(/^[-•*]\s/)) {
+                if (!inList) { html += '<ul>'; inList = true; }
+                html += '<li>' + Diary.inlineFormat(trimmed.replace(/^[-•*]\s/, '')) + '</li>';
+                continue;
+            }
+
+            if (inList) { html += '</ul>'; inList = false; }
+            html += '<p>' + Diary.inlineFormat(trimmed) + '</p>';
         }
-        saveNext();
+        if (inList) html += '</ul>';
+        return html;
     },
 
-    askDoctor: function (id) {
-        var entries = Diary.getEntries();
-        var entry = null;
-        for (var i = 0; i < entries.length; i++) {
-            if (entries[i].id === id) { entry = entries[i]; break; }
-        }
-        if (!entry) return;
-
-        App.navigateTo('doctor');
-        var text = 'Проанализируйте мои показатели здоровья:\n\n' + Diary._formatEntryText(entry);
-        var input = document.getElementById('chat-input');
-        if (input) {
-            input.value = text;
-            input.focus();
-        }
-    },
-
-    saveToFile: function (id) {
-        var entries = Diary.getEntries();
-        var entry = null;
-        for (var i = 0; i < entries.length; i++) {
-            if (entries[i].id === id) { entry = entries[i]; break; }
-        }
-        if (!entry) return;
-
-        var profile = entry.profileId ? Storage.getProfileById(entry.profileId) : null;
-        var date = new Date().toLocaleDateString('ru-RU');
-
-        var body = '<h2>Запись дневника здоровья</h2>';
-        body += '<p><strong>Дата измерения:</strong> ' + UI.escapeHtml(Diary.formatDate(entry.date)) + ' ' + UI.escapeHtml(entry.time || '') + '</p>';
-        if (profile) body += '<p><strong>Пациент:</strong> ' + UI.escapeHtml(profile.name) + '</p>';
-        body += '<hr><table>';
-        if (entry.systolic && entry.diastolic) body += '<tr><td><strong>Артериальное давление</strong></td><td>' + entry.systolic + '/' + entry.diastolic + ' мм рт.ст.</td></tr>';
-        if (entry.pulse) body += '<tr><td><strong>Пульс</strong></td><td>' + entry.pulse + ' уд/мин</td></tr>';
-        if (entry.sugar) body += '<tr><td><strong>Сахар крови</strong></td><td>' + entry.sugar + ' ммоль/л</td></tr>';
-        if (entry.temperature) body += '<tr><td><strong>Температура</strong></td><td>' + entry.temperature + '°C</td></tr>';
-        if (entry.weight) body += '<tr><td><strong>Вес</strong></td><td>' + entry.weight + ' кг</td></tr>';
-        body += '</table>';
-        if (entry.notes) body += '<hr><h3>Заметки</h3><p>' + UI.escapeHtml(entry.notes).replace(/\n/g, '<br>') + '</p>';
-
-        var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-            '<title>Дневник здоровья — ' + UI.escapeHtml(Diary.formatDate(entry.date)) + '</title>' +
-            '<style>' +
-            'body{font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:30px;color:#222;font-size:14px;line-height:1.6}' +
-            '.header{text-align:center;border-bottom:2px solid #2563eb;padding-bottom:16px;margin-bottom:24px}' +
-            '.header h1{color:#2563eb;margin:0;font-size:22px}' +
-            '.header p{margin:4px 0;color:#666;font-size:13px}' +
-            'h2{color:#2563eb;font-size:18px}h3{color:#1e40af;font-size:15px}' +
-            'table{width:100%;border-collapse:collapse;margin:12px 0}' +
-            'td{border:1px solid #ccc;padding:8px 12px;font-size:14px}' +
-            'tr td:first-child{background:#e8f0fe;width:45%;font-weight:bold}' +
-            'hr{border:none;border-top:1px solid #ddd;margin:16px 0}' +
-            '.footer{text-align:center;margin-top:30px;padding-top:16px;border-top:1px solid #ddd;color:#999;font-size:11px}' +
-            '@media print{body{padding:15px}}' +
-            '</style></head><body>' +
-            '<div class="header"><h1>🩺 Мой домашний доктор</h1><p>Дневник здоровья · ' + date + '</p></div>' +
-            body +
-            '<div class="footer">Документ сформирован приложением «Мой домашний доктор»</div>' +
-            '</body></html>';
-
-        return UI.savePDF(html, 'diary_' + (entry.date || 'entry') + '.pdf');
+    inlineFormat: function (s) {
+        return UI.escapeHtml(s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     }
 };

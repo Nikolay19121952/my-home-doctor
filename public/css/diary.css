@@ -1,0 +1,480 @@
+/* ============================================================================
+   ДНЕВНИК ЗДОРОВЬЯ v2.1 — стили макетов №2, №3, №4 (ТЗ раздел 6)
+
+   Цветовая схема взята из раздела 6.5 ТЗ и согласована с палитрой приложения.
+   Размеры кнопок и шрифтов намеренно больше, чем в ТЗ (там 40×40px / 16pt):
+   раздел рассчитан на пожилых пользователей, поэтому сенсорные цели 48px
+   и базовый шрифт приложения 18px.
+   ========================================================================== */
+
+/* --- Заголовки экранов --------------------------------------------------- */
+.dv-head {
+    margin-bottom: var(--spacing-md);
+}
+
+.dv-title {
+    font-size: var(--font-size-large);
+    margin: 0;
+}
+
+.dv-sub {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-small);
+    margin-top: 4px;
+}
+
+.dv-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    padding: 0 var(--spacing-sm) 0 0;
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.dv-muted {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-small);
+}
+
+.dv-center {
+    text-align: center;
+    margin: var(--spacing-xs) 0;
+}
+
+/* --- Незавершённый черновик ---------------------------------------------- */
+.dv-draft {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    background: #FFF8E1;
+    border: 2px solid #FFA500;
+    border-radius: var(--radius);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.dv-draft-text {
+    font-size: var(--font-size-small);
+    flex: 1 1 200px;
+}
+
+/* --- Фильтр по периоду (кнопка №1) --------------------------------------- */
+.dv-filter {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.dv-filter-row {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.dv-filter-row label {
+    flex: 1 1 140px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: var(--font-size-small);
+    color: var(--color-text-secondary);
+}
+
+.dv-filter-row input {
+    min-height: var(--touch-min);
+    padding: 0 var(--spacing-sm);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+}
+
+.dv-filter-btns {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+}
+
+/* --- Панель управления --------------------------------------------------- */
+.dv-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-xs);
+    margin: var(--spacing-md) 0;
+}
+
+.dv-pbtn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    min-height: var(--touch-min);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--color-card);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: var(--font-size-small);
+    font-weight: 600;
+    color: var(--color-text);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+
+.dv-pbtn:hover,
+.dv-pbtn:focus {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.dv-pbtn-icon {
+    font-size: 22px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.dv-btn-main {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+
+.dv-btn-main:hover,
+.dv-btn-main:focus {
+    background: var(--color-primary-dark);
+    border-color: var(--color-primary-dark);
+    color: #fff;
+}
+
+.dv-btn-done {
+    background: var(--color-secondary);
+    border-color: var(--color-secondary);
+    color: #fff;
+}
+
+.dv-btn-done:hover,
+.dv-btn-done:focus {
+    background: #1B5E20;
+    border-color: #1B5E20;
+    color: #fff;
+}
+
+/* --- Панель выбранных дней ----------------------------------------------- */
+.dv-selbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    background: var(--color-primary-light);
+    border-radius: var(--radius);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    font-weight: 600;
+}
+
+/* --- Список записей (макет №2) ------------------------------------------- */
+.dv-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.dv-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--spacing-sm) var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.dv-item:hover {
+    background: #E6F2FF;
+}
+
+.dv-check {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.dv-check input {
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    accent-color: var(--color-primary);
+}
+
+.dv-item-body {
+    flex: 1 1 200px;
+    min-width: 0;
+}
+
+.dv-item-date {
+    font-weight: 600;
+    font-size: var(--font-size-base);
+}
+
+.dv-badge {
+    display: inline-block;
+    background: var(--color-primary-light);
+    color: var(--color-primary-dark);
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 14px;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+.dv-item-brief {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-small);
+    margin-top: 2px;
+}
+
+.dv-item-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+.dv-del {
+    min-width: var(--touch-min);
+    min-height: var(--touch-min);
+    background: none;
+    border: none;
+    color: var(--color-danger);
+    font-size: 22px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+}
+
+.dv-del:hover,
+.dv-del:focus {
+    background: var(--color-danger-light);
+}
+
+/* --- Форма записи измерений (макет №3) ----------------------------------- */
+.dv-daterow {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--spacing-md);
+}
+
+.dv-daterow label {
+    font-weight: 600;
+}
+
+.dv-daterow input[type="date"] {
+    min-height: var(--touch-min);
+    padding: 0 var(--spacing-sm);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    border: 2px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+}
+
+.dv-lock {
+    flex: 1 1 100%;
+    color: var(--color-text-secondary);
+    font-size: 15px;
+}
+
+.dv-counter {
+    margin: var(--spacing-sm) 0;
+    font-size: var(--font-size-small);
+    color: var(--color-text-secondary);
+}
+
+.dv-savehint {
+    color: var(--color-secondary);
+}
+
+/* --- Сообщения об ошибках (раздел 4.3 ТЗ) -------------------------------- */
+.dv-err {
+    display: none;
+    background: #FFCCCC;
+    border-left: 4px solid #FF0000;
+    color: #8B0000;
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin: var(--spacing-xs) 0;
+    font-size: var(--font-size-small);
+    font-weight: 600;
+}
+
+.dv-err-warn {
+    background: #FFFFCC;
+    border-left-color: #FFA500;
+    color: #7A4F00;
+}
+
+/* --- Таблица измерений 36 × 8 -------------------------------------------- */
+.dv-tablewrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-card);
+}
+
+.dv-table {
+    width: 100%;
+    min-width: 620px;
+    border-collapse: collapse;
+    font-size: 15px;
+}
+
+.dv-table th {
+    background: #0066CC;
+    color: #fff;
+    border: 1px solid #CCCCCC;
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.dv-table td {
+    border: 1px solid #CCCCCC;
+    padding: 0;
+    text-align: center;
+}
+
+.dv-c-num {
+    width: 40px;
+    background: #F5F5F5;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    padding: 6px 0 !important;
+}
+
+.dv-cell {
+    width: 100%;
+    min-height: 44px;
+    border: none;
+    background: transparent;
+    text-align: center;
+    font-family: inherit;
+    font-size: 16px;
+    padding: 6px 2px;
+    color: var(--color-text);
+}
+
+.dv-cell:focus {
+    outline: none;
+}
+
+.dv-cell-active {
+    background: #E6F2FF;
+    box-shadow: inset 0 0 0 2px #0066CC;
+}
+
+.dv-cell-err {
+    background: #FFCCCC;
+    box-shadow: inset 0 0 0 2px #FF0000;
+}
+
+.dv-cell-warn {
+    background: #FFFFCC;
+    box-shadow: inset 0 0 0 2px #FFA500;
+}
+
+/* --- Чат консультаций (макет №4) ----------------------------------------- */
+.dv-msg {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.dv-msg-user {
+    background: var(--color-primary-light);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+.dv-msg-who {
+    font-weight: 600;
+    font-size: var(--font-size-small);
+    color: var(--color-primary-dark);
+}
+
+.dv-msg-days {
+    font-size: var(--font-size-small);
+    color: var(--color-text-secondary);
+    margin-top: 2px;
+}
+
+.dv-msg-text {
+    margin-top: var(--spacing-xs);
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+}
+
+.dv-msg-text h3 {
+    font-size: var(--font-size-base);
+    color: var(--color-primary-dark);
+    margin: var(--spacing-sm) 0 4px;
+}
+
+.dv-msg-text p {
+    margin: 6px 0;
+}
+
+.dv-msg-text ul {
+    margin: 6px 0 6px 22px;
+}
+
+.dv-msg-text li {
+    margin: 3px 0;
+}
+
+.dv-msg-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--color-border);
+}
+
+/* --- Адаптив для смартфона ----------------------------------------------- */
+@media (max-width: 600px) {
+    .dv-panel {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .dv-item-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .dv-pbtn-label {
+        font-size: 15px;
+    }
+}

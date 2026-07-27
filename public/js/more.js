@@ -522,10 +522,12 @@ var More = {
 
     exportData: function () {
         var data = {
-            version: '1.0',
+            version: '2.1',
             exportDate: new Date().toISOString(),
             profiles: Storage.getProfiles(),
-            diary: Diary.getEntries(),
+            diaryRecords: Diary.getRecords(),
+            diaryCurrent: Diary.getCurrent(),
+            diaryChat: Diary.getChat(),
             reminders: More.getReminders(),
             analyses: More.getAnalyses(),
             chatHistory: Doctor.getHistory()
@@ -559,7 +561,15 @@ var More = {
                     'Импортировать',
                     function () {
                         if (data.profiles) Storage.saveProfiles(data.profiles);
-                        if (data.diary) Diary.saveEntries(data.diary);
+                        // Дневник v2.1 (по дням)
+                        if (data.diaryRecords) Diary.saveRecords(data.diaryRecords);
+                        if (data.diaryChat) Diary.saveChat(data.diaryChat);
+                        if (data.diaryCurrent !== undefined) Diary.saveCurrent(data.diaryCurrent);
+                        // Резервные копии старого формата (v1) — переносим в новый
+                        if (data.diary && !data.diaryRecords) {
+                            localStorage.setItem(Diary.LEGACY_KEY, JSON.stringify(data.diary));
+                            Diary.migrateLegacy();
+                        }
                         if (data.reminders) More.saveReminders(data.reminders);
                         if (data.analyses) More.saveAnalyses(data.analyses);
                         if (data.chatHistory) Doctor.saveHistory(data.chatHistory);
@@ -583,6 +593,11 @@ var More = {
             function () {
                 localStorage.removeItem('mdd_profiles');
                 localStorage.removeItem('mdd_diary');
+                localStorage.removeItem('mdd_diary_records');
+                localStorage.removeItem('mdd_diary_current');
+                localStorage.removeItem('mdd_diary_chat');
+                localStorage.removeItem('mdd_diary_settings');
+                localStorage.removeItem('mdd_diary_v1_backup');
                 localStorage.removeItem('mdd_reminders');
                 localStorage.removeItem('mdd_analyses');
                 localStorage.removeItem('mdd_chat_history');
