@@ -461,7 +461,7 @@ var Diary = {
             (dateLocked ? ' data-locked="1"' : '') +
             ' onchange="Diary.onDateChange(this)">' +
             (dateLocked
-                ? '<span class="dv-lock">🔒 Дата заблокирована — завершите запись кнопкой «Завершить запись»</span>'
+                ? '<span class="dv-lock">🔒 Изменение даты в этом окне заблокировано</span>'
                 : '') +
             '</div>';
         html += '<div class="dv-err" id="dv-date-err"></div>';
@@ -707,7 +707,7 @@ var Diary = {
             if (row && !row.querySelector('.dv-lock')) {
                 var hint = document.createElement('span');
                 hint.className = 'dv-lock';
-                hint.textContent = '🔒 Дата заблокирована — завершите запись кнопкой «Завершить запись»';
+                hint.textContent = '🔒 Изменение даты в этом окне заблокировано';
                 row.appendChild(hint);
             }
         }
