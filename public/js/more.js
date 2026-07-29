@@ -506,10 +506,13 @@ var More = {
 
         html += '<div class="settings-list">' +
             '<div class="settings-section"><h3>Экспорт данных</h3>' +
-            '<p class="settings-desc">Сохраните все данные в файл для резервной копии или переноса на другое устройство.</p>' +
+            '<p class="settings-desc">Сохраните в файл всё сразу: профили семьи, дневник, ' +
+            'историю консультаций, анализы и напоминания. Файл подойдёт и для резервной копии, ' +
+            'и для переноса на другое устройство.</p>' +
             '<button class="btn btn-primary btn-full" onclick="More.exportData()">📥 Экспортировать данные</button></div>' +
             '<div class="settings-section"><h3>Импорт данных</h3>' +
-            '<p class="settings-desc">Загрузите ранее сохранённый файл с данными.</p>' +
+            '<p class="settings-desc">Загрузите ранее сохранённый файл. Перед восстановлением ' +
+            'приложение покажет, что именно в нём лежит.</p>' +
             '<input type="file" id="import-file" accept=".json" style="display:none;" onchange="More.importData()">' +
             '<button class="btn btn-outline btn-full" onclick="document.getElementById(\'import-file\').click()">📤 Импортировать данные</button></div>' +
             '<div class="settings-section"><h3>Очистка</h3>' +
@@ -520,14 +523,22 @@ var More = {
         container.innerHTML = html;
     },
 
+    /* ------------------------------------------------------------------
+     * ЭКСПОРТ ДАННЫХ
+     * Единственное место в приложении, где сохраняется резервная копия.
+     * Выгружается вся конфигурация: профили семьи, дневник (включая
+     * незавершённый черновик), обе истории чата, анализы и напоминания.
+     * ---------------------------------------------------------------- */
     exportData: function () {
         var data = {
-            version: '2.1',
+            version: '2.3',
             exportDate: new Date().toISOString(),
+            device: navigator.userAgent,
             profiles: Storage.getProfiles(),
             diaryRecords: Diary.getRecords(),
             diaryCurrent: Diary.getCurrent(),
             diaryChat: Diary.getChat(),
+            diarySettings: Diary.getSettings(),
             reminders: More.getReminders(),
             analyses: More.getAnalyses(),
             chatHistory: Doctor.getHistory()
@@ -542,47 +553,125 @@ var More = {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        UI.showToast('Данные экспортированы');
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        UI.showToast('Экспорт готов! Файл загружается...', 3000);
     },
 
+    /* Приводит файл любого из прежних форматов к единому виду.
+       Понимает: текущий формат, формат кнопки «Экспорт» из дневника
+       (family_profile_*.json) и самый первый плоский дневник v1. */
+    normalizeBackup: function (data) {
+        if (!data || typeof data !== 'object') return null;
+
+        var out = {
+            profiles: data.profiles || data.profile || null,
+            diaryRecords: data.diaryRecords || data.diary || null,
+            diaryCurrent: data.diaryCurrent !== undefined ? data.diaryCurrent : data.diary_current,
+            diaryChat: data.diaryChat || data.chat || null,
+            diarySettings: data.diarySettings || data.settings || null,
+            reminders: data.reminders || null,
+            analyses: data.analyses || null,
+            chatHistory: data.chatHistory || data.doctor_chat || null,
+            legacyDiary: null
+        };
+
+        // В самом первом формате дневник был плоским массивом измерений
+        if (out.diaryRecords && Object.prototype.toString.call(out.diaryRecords) === '[object Array]') {
+            out.legacyDiary = out.diaryRecords;
+            out.diaryRecords = null;
+        }
+
+        var hasSomething = out.profiles || out.diaryRecords || out.legacyDiary ||
+            out.diaryChat || out.chatHistory || out.reminders || out.analyses;
+        return hasSomething ? out : null;
+    },
+
+    /* ------------------------------------------------------------------
+     * ИМПОРТ ДАННЫХ
+     * ---------------------------------------------------------------- */
     importData: function () {
         var fileInput = document.getElementById('import-file');
         var file = fileInput.files[0];
         if (!file) return;
 
         var reader = new FileReader();
+
         reader.onload = function (e) {
+            var raw;
             try {
-                var data = JSON.parse(e.target.result);
-                UI.showConfirm(
-                    'Импортировать данные?',
-                    'Текущие данные будут заменены данными из файла. Это действие нельзя отменить.',
-                    'Импортировать',
-                    function () {
-                        if (data.profiles) Storage.saveProfiles(data.profiles);
-                        // Дневник v2.1 (по дням)
-                        if (data.diaryRecords) Diary.saveRecords(data.diaryRecords);
-                        if (data.diaryChat) Diary.saveChat(data.diaryChat);
-                        if (data.diaryCurrent !== undefined) Diary.saveCurrent(data.diaryCurrent);
-                        // Резервные копии старого формата (v1) — переносим в новый
-                        if (data.diary && !data.diaryRecords) {
-                            localStorage.setItem(Diary.LEGACY_KEY, JSON.stringify(data.diary));
-                            Diary.migrateLegacy();
-                        }
-                        if (data.reminders) More.saveReminders(data.reminders);
-                        if (data.analyses) More.saveAnalyses(data.analyses);
-                        if (data.chatHistory) Doctor.saveHistory(data.chatHistory);
-                        UI.showToast('Данные импортированы');
-                        More.renderSettings(document.querySelector('#more .container'));
-                    }
-                );
+                raw = JSON.parse(e.target.result);
             } catch (err) {
-                UI.showToast('Ошибка: неверный формат файла');
+                UI.showToast('Неверный формат файла — это не резервная копия', 4000);
+                fileInput.value = '';
+                return;
             }
+
+            var data = More.normalizeBackup(raw);
+            if (!data) {
+                UI.showToast('В файле нет данных приложения', 4000);
+                fileInput.value = '';
+                return;
+            }
+
+            // Показываем, что именно лежит в файле, до перезаписи
+            var parts = [];
+            if (data.profiles) {
+                parts.push(data.profiles.length +
+                    Diary.plural(data.profiles.length, ' профиль', ' профиля', ' профилей'));
+            }
+            var days = data.diaryRecords ? Object.keys(data.diaryRecords).length
+                : (data.legacyDiary ? data.legacyDiary.length : 0);
+            if (days) {
+                parts.push(days + Diary.plural(days, ' запись', ' записи', ' записей') + ' дневника');
+            }
+            if (data.diaryChat && data.diaryChat.length) {
+                parts.push(data.diaryChat.length +
+                    Diary.plural(data.diaryChat.length, ' консультация', ' консультации', ' консультаций'));
+            }
+            if (data.analyses && data.analyses.length) {
+                parts.push(data.analyses.length +
+                    Diary.plural(data.analyses.length, ' анализ', ' анализа', ' анализов'));
+            }
+            if (data.reminders && data.reminders.length) {
+                parts.push(data.reminders.length +
+                    Diary.plural(data.reminders.length, ' напоминание', ' напоминания', ' напоминаний'));
+            }
+
+            UI.showConfirm(
+                'Это перезапишет текущие данные!',
+                'В файле: ' + (parts.length ? parts.join(', ') : 'данные приложения') +
+                '. Продолжить восстановление?',
+                'Восстановить',
+                function () {
+                    if (data.profiles) Storage.saveProfiles(data.profiles);
+                    if (data.diaryRecords) Diary.saveRecords(data.diaryRecords);
+                    if (data.diaryChat) Diary.saveChat(data.diaryChat);
+                    if (data.diarySettings) Diary.saveSettings(data.diarySettings);
+                    Diary.saveCurrent(data.diaryCurrent || null);
+
+                    // Плоский дневник первой версии переносим в формат по дням
+                    if (data.legacyDiary) {
+                        localStorage.setItem(Diary.LEGACY_KEY, JSON.stringify(data.legacyDiary));
+                        Diary.migrateLegacy();
+                    }
+
+                    if (data.reminders) More.saveReminders(data.reminders);
+                    if (data.analyses) More.saveAnalyses(data.analyses);
+                    if (data.chatHistory) Doctor.saveHistory(data.chatHistory);
+
+                    UI.showToast('Данные восстановлены! Перезагружаю...', 2000);
+                    setTimeout(function () { location.reload(); }, 1200);
+                }
+            );
+            fileInput.value = '';
         };
+
+        reader.onerror = function () {
+            UI.showToast('Не удалось прочитать файл', 3500);
+            fileInput.value = '';
+        };
+
         reader.readAsText(file);
-        fileInput.value = '';
     },
 
     clearAllData: function () {
@@ -659,8 +748,8 @@ var More = {
             'черновик сохраняется сам. Кнопка «Сохранить и выйти» откладывает запись, «Завершить запись» ' +
             'закрывает день и предлагает распечатать или сохранить его в PDF. ' +
             'В списке отметьте галочками нужные дни и нажмите «🩺 Отправить доктору» — ответ появится ' +
-            'в «Истории чата». Кнопки «Экспорт» и «Импорт» переносят все данные между устройствами ' +
-            'через файл JSON.</div></div>' +
+            'в «Истории чата». Для переноса данных на другое устройство используйте ' +
+            '«Ещё → Настройки → Экспортировать данные».</div></div>' +
             '<div class="about-step"><span class="about-step-icon">🩺</span>' +
             '<div><strong>Доктор</strong> — чат с ИИ-доктором. Опишите симптомы, прикрепите файлы анализов ' +
             '(PDF, фото) через кнопку 📎 или перетащите их в чат. Доктор расшифрует результаты и даст рекомендации. ' +
@@ -673,9 +762,10 @@ var More = {
             '<div><strong>Напоминания</strong> — создавайте напоминания о приёме лекарств и визитах к врачу. ' +
             'Кнопка 📅 добавит событие в Google Календарь.</div></div>' +
             '<div class="about-step"><span class="about-step-icon">⚙️</span>' +
-            '<div><strong>Настройки</strong> — экспорт и импорт данных. Используйте «Экспортировать данные» для создания ' +
-            'резервной копии всех профилей, дневника, анализов и напоминаний в формате JSON. ' +
-            '«Импортировать данные» восстановит данные из ранее сохранённой копии.</div></div>' +
+            '<div><strong>Настройки</strong> — экспорт и импорт данных. «Экспортировать данные» сохранит ' +
+            'в один файл JSON всю конфигурацию: профили семьи, дневник, обе истории переписки с доктором, ' +
+            'анализы и напоминания. «Импортировать данные» восстановит всё это на другом устройстве ' +
+            'или после очистки браузера.</div></div>' +
             '</div></div>';
 
         html += '<div class="about-card">' +

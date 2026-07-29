@@ -1,4 +1,4 @@
-/* ============================================================================
+﻿/* ============================================================================
  * ДНЕВНИК ЗДОРОВЬЯ — версия 2.1 (WEB/PWA)
  * Реализация по ТЗ v2.1 «Раздел ДНЕВНИК приложения МОЙ ДОМАШНИЙ ДОКТОР»
  *
@@ -240,15 +240,15 @@ var Diary = {
             '<button class="btn btn-outline btn-small" onclick="Diary.clearPeriod()">Сбросить</button>' +
             '</div></div>';
 
-        // Панель управления — 7 кнопок ТЗ
+        // Панель управления. Экспорт и импорт с версии 2.3 живут в разделе
+        // «Настройки» — там они выгружают всю конфигурацию целиком,
+        // а не только дневник.
         html += '<div class="dv-panel">' +
             Diary.panelBtn('1', '📅', 'Выбрать период', 'Diary.togglePeriod()') +
             Diary.panelBtn('2', '⬆️', 'Прокрутить вверх', 'Diary.scrollList(-1)') +
             Diary.panelBtn('3', '⬇️', 'Прокрутить вниз', 'Diary.scrollList(1)') +
             Diary.panelBtn('4', '📝', 'Запись измерений', 'Diary.openForm()', 'dv-btn-main') +
             Diary.panelBtn('5', '💬', 'История чата', 'Diary.show(\'chat\')') +
-            Diary.panelBtn('6', '📤', 'Экспорт', 'Diary.exportData()') +
-            Diary.panelBtn('7', '📥', 'Импорт', 'Diary.importPrompt()') +
             '</div>';
 
         // Кнопка консультации — появляется, когда отмечены дни
@@ -314,7 +314,7 @@ var Diary = {
             '</div>' +
             '<div class="dv-item-actions">' +
             '<button class="btn btn-outline btn-small" onclick="Diary.openRecord(\'' + rec.date + '\')">Откр.</button>' +
-            '<button class="btn btn-outline btn-small" onclick="Diary.printRecord(\'' + rec.date + '\')" title="Печать или сохранение в PDF">🖨️</button>' +
+            '<button class="btn btn-outline btn-small" onclick="Diary.printRecord(\'' + rec.date + '\')" title="Печать или сохранение в PDF">🖨️ / 📄</button>' +
             '<button class="dv-del" onclick="Diary.deleteRecord(\'' + rec.date + '\')" title="Удалить">✕</button>' +
             '</div></div>';
     },
@@ -1291,106 +1291,6 @@ var Diary = {
         w.focus();
         w.print();
         UI.showToast('Для сохранения в PDF выберите принтер «Сохранить как PDF»', 5000);
-    },
-
-    /* ======================================================================
-     * ЭКСПОРТ / ИМПОРТ (синхронизация между устройствами)
-     * ==================================================================== */
-    exportData: function () {
-        var payload = {
-            export_metadata: {
-                version: '2.1',
-                exported_at: new Date().toISOString(),
-                device: navigator.userAgent,
-                app_version: '2.1.0'
-            },
-            profile: Storage.getProfiles(),
-            diary: Diary.getRecords(),
-            diary_current: Diary.getCurrent(),
-            chat: Diary.getChat(),
-            doctor_chat: Diary._read(Doctor.HISTORY_KEY, []),
-            settings: Diary.getSettings()
-        };
-
-        var json = JSON.stringify(payload, null, 2);
-        var blob = new Blob([json], { type: 'application/json' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'family_profile_' + new Date().toISOString().split('T')[0] + '.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-
-        UI.showToast('Экспорт готов! Файл загружается...', 3000);
-    },
-
-    importPrompt: function () {
-        var input = document.getElementById('dv-import-file');
-        if (input) input.click();
-    },
-
-    handleImportFile: function (input) {
-        if (!input.files || input.files.length === 0) return;
-        var file = input.files[0];
-        var reader = new FileReader();
-
-        reader.onload = function (e) {
-            var data;
-            try {
-                data = JSON.parse(e.target.result);
-            } catch (err) {
-                UI.showToast('Неверный формат файла — это не файл дневника', 4000);
-                input.value = '';
-                return;
-            }
-
-            // Валидация структуры
-            if (!data || (!data.diary && !data.profile && !data.chat)) {
-                UI.showToast('Неверный формат файла — нет данных дневника', 4000);
-                input.value = '';
-                return;
-            }
-
-            var summary = [];
-            if (data.diary) summary.push(Object.keys(data.diary).length + Diary.plural(
-                Object.keys(data.diary).length, ' запись', ' записи', ' записей'));
-            if (data.chat) summary.push(data.chat.length + Diary.plural(
-                data.chat.length, ' консультация', ' консультации', ' консультаций'));
-            if (data.profile) summary.push(data.profile.length + Diary.plural(
-                data.profile.length, ' профиль', ' профиля', ' профилей'));
-
-            UI.showConfirm(
-                'Это перезапишет текущие данные!',
-                'В файле: ' + summary.join(', ') + '. Продолжить восстановление?',
-                'Восстановить',
-                function () {
-                    if (data.profile) Storage.saveProfiles(data.profile);
-                    if (data.diary) Diary.saveRecords(data.diary);
-                    if (data.chat) Diary.saveChat(data.chat);
-                    if (data.settings) Diary.saveSettings(data.settings);
-                    if (data.diary_current) {
-                        Diary.saveCurrent(data.diary_current);
-                    } else {
-                        Diary.saveCurrent(null);
-                    }
-                    if (data.doctor_chat) {
-                        localStorage.setItem(Doctor.HISTORY_KEY, JSON.stringify(data.doctor_chat));
-                    }
-                    UI.showToast('Данные восстановлены! Перезагружаю...', 2000);
-                    setTimeout(function () { location.reload(); }, 1200);
-                }
-            );
-            input.value = '';
-        };
-
-        reader.onerror = function () {
-            UI.showToast('Не удалось прочитать файл', 3500);
-            input.value = '';
-        };
-
-        reader.readAsText(file);
     },
 
     /* ======================================================================
