@@ -1,9 +1,10 @@
-var CACHE_NAME = 'mdd-v14';
+var CACHE_NAME = 'mdd-v15';
 var ASSETS = [
     './',
     './index.html',
     './css/styles.css',
     './css/diary.css',
+    './css/about.css',
     './js/app.js',
     './js/storage.js',
     './js/profiles.js',

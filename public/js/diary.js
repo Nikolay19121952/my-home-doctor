@@ -30,12 +30,13 @@ var Diary = {
         ad_top: { min: 60, max: 250, label: 'АД верх', unit: 'мм рт.ст', show: '60–250' },
         ad_bottom: { min: 30, max: 150, label: 'АД низ', unit: 'мм рт.ст', show: '30–150' },
         pulse: { min: 20, max: 200, label: 'пульса', unit: 'уд/мин', show: '20–200' },
+        spo2: { min: 85, max: 100, label: 'SpO2', unit: '', show: '85–100%' },
         sugar: { min: 2.0, max: 20.0, label: 'сахара', unit: 'ммоль/л', show: '2.0–20.0' },
         temperature: { min: 34.0, max: 43.0, label: 'температуры', unit: '°C', show: '34.0–43.0' },
         weight: { min: 20, max: 250, label: 'веса', unit: 'кг', show: '20–250' }
     },
 
-    FIELDS: ['time', 'ad_top', 'ad_bottom', 'pulse', 'sugar', 'temperature', 'weight'],
+    FIELDS: ['time', 'ad_top', 'ad_bottom', 'pulse', 'spo2', 'sugar', 'temperature', 'weight'],
 
     /* --- Состояние экрана -------------------------------------------------- */
     view: 'list',
@@ -98,6 +99,7 @@ var Diary = {
                 ad_top: e.systolic || null,
                 ad_bottom: e.diastolic || null,
                 pulse: e.pulse || null,
+                spo2: null,               // в v1 сатурация не измерялась
                 sugar: e.sugar || null,
                 temperature: e.temperature || null,
                 weight: e.weight || null,
@@ -291,6 +293,7 @@ var Diary = {
             var vals = [];
             if (last.ad_top && last.ad_bottom) vals.push('АД ' + last.ad_top + '/' + last.ad_bottom);
             if (last.pulse) vals.push('пульс ' + last.pulse);
+            if (last.spo2) vals.push('SpO2 ' + last.spo2 + '%');
             if (last.sugar) vals.push('сахар ' + last.sugar);
             if (last.temperature) vals.push('t° ' + last.temperature);
             if (last.weight) vals.push('вес ' + last.weight);
@@ -311,7 +314,7 @@ var Diary = {
             '</div>' +
             '<div class="dv-item-actions">' +
             '<button class="btn btn-outline btn-small" onclick="Diary.openRecord(\'' + rec.date + '\')">Откр.</button>' +
-            '<button class="btn btn-outline btn-small" onclick="Diary.printRecord(\'' + rec.date + '\')" title="Печать / PDF">🖨️</button>' +
+            '<button class="btn btn-outline btn-small" onclick="Diary.printRecord(\'' + rec.date + '\')" title="Печать или сохранение в PDF">🖨️</button>' +
             '<button class="dv-del" onclick="Diary.deleteRecord(\'' + rec.date + '\')" title="Удалить">✕</button>' +
             '</div></div>';
     },
@@ -496,6 +499,7 @@ var Diary = {
             '<th>АД верх</th>' +
             '<th>АД низ</th>' +
             '<th>Пульс</th>' +
+            '<th>SpO2</th>' +
             '<th>Сахар</th>' +
             '<th>t°</th>' +
             '<th>Вес</th>' +
@@ -509,6 +513,7 @@ var Diary = {
                 Diary.cell(i, 'ad_top', m.ad_top, 'number') +
                 Diary.cell(i, 'ad_bottom', m.ad_bottom, 'number') +
                 Diary.cell(i, 'pulse', m.pulse, 'number') +
+                Diary.cell(i, 'spo2', m.spo2, 'number') +
                 Diary.cell(i, 'sugar', m.sugar, 'decimal') +
                 Diary.cell(i, 'temperature', m.temperature, 'decimal') +
                 Diary.cell(i, 'weight', m.weight, 'decimal') +
@@ -598,7 +603,7 @@ var Diary = {
         while (rec.measurements.length <= row) {
             rec.measurements.push({
                 id: rec.measurements.length + 1,
-                time: '', ad_top: null, ad_bottom: null, pulse: null,
+                time: '', ad_top: null, ad_bottom: null, pulse: null, spo2: null,
                 sugar: null, temperature: null, weight: null, notes: ''
             });
         }
@@ -666,7 +671,7 @@ var Diary = {
         var r = Diary.RANGES[field];
         if (r && (num < r.min || num > r.max)) {
             input.classList.add('dv-cell-err');
-            Diary.showCellError('Диапазон ' + r.label + ': ' + r.show + ' ' + r.unit);
+            Diary.showCellError(('Диапазон ' + r.label + ': ' + r.show + ' ' + r.unit).trim());
             return;
         }
 
@@ -678,6 +683,17 @@ var Diary = {
             if (m.ad_top < m.ad_bottom) {
                 input.classList.add('dv-cell-warn');
                 Diary.showCellError('Внимание: верхнее давление должно быть больше нижнего. Проверьте!', true);
+            }
+        }
+
+        // Валидация №17: предупреждения о низкой сатурации.
+        // Значение уже прошло проверку диапазона 85–100, здесь только
+        // подсказываем, насколько показатель тревожный.
+        if (field === 'spo2') {
+            var alert17 = Diary.spo2Alert(num);
+            if (alert17) {
+                input.classList.add('dv-cell-warn');
+                Diary.showCellError(alert17, true);
             }
         }
 
@@ -1049,6 +1065,7 @@ var Diary = {
                 var parts = [];
                 if (m.ad_top && m.ad_bottom) parts.push('АД ' + m.ad_top + '/' + m.ad_bottom);
                 if (m.pulse) parts.push('Пульс ' + m.pulse);
+                if (m.spo2) parts.push('SpO2 ' + m.spo2 + '%');
                 if (m.sugar) parts.push('Сахар ' + m.sugar);
                 if (m.temperature) parts.push('t° ' + m.temperature);
                 if (m.weight) parts.push('Вес ' + m.weight + ' кг');
@@ -1121,8 +1138,10 @@ var Diary = {
                 '</div>';
             html += '<div class="dv-msg-actions">' +
                 '<button class="btn btn-outline btn-small" onclick="Diary.copyConsult(\'' + c.id + '\')">📋 Копировать</button>' +
-                '<button class="btn btn-outline btn-small" onclick="Diary.printConsult(\'' + c.id + '\')">🖨️ Печать</button>' +
-                '<button class="btn btn-outline btn-small" onclick="Diary.printConsult(\'' + c.id + '\')">📄 PDF</button>' +
+                // v2.2: одна кнопка вместо трёх — браузер сам предложит
+                // напечатать или сохранить в PDF
+                '<button class="btn btn-outline btn-small" title="Печать или сохранение в PDF"' +
+                ' onclick="Diary.printConsult(\'' + c.id + '\')">🖨️ Печать / 💾 Файл</button>' +
                 '<button class="dv-del" onclick="Diary.deleteConsult(\'' + c.id + '\')" title="Удалить">✕</button>' +
                 '</div>';
             html += '</div>';
@@ -1204,7 +1223,7 @@ var Diary = {
         var body = '<h2>Дневник здоровья за ' + UI.escapeHtml(Diary.formatDay(day)) + '</h2>';
         body += '<table class="grid"><tr>' +
             '<th>№</th><th>Время</th><th>АД верх</th><th>АД низ</th>' +
-            '<th>Пульс</th><th>Сахар</th><th>t°</th><th>Вес</th></tr>';
+            '<th>Пульс</th><th>SpO2, %</th><th>Сахар</th><th>t°</th><th>Вес</th></tr>';
         for (var i = 0; i < rows.length; i++) {
             var m = rows[i];
             body += '<tr>' +
@@ -1213,6 +1232,7 @@ var Diary = {
                 '<td>' + Diary.cellText(m.ad_top) + '</td>' +
                 '<td>' + Diary.cellText(m.ad_bottom) + '</td>' +
                 '<td>' + Diary.cellText(m.pulse) + '</td>' +
+                '<td>' + Diary.cellText(m.spo2) + '</td>' +
                 '<td>' + Diary.cellText(m.sugar) + '</td>' +
                 '<td>' + Diary.cellText(m.temperature) + '</td>' +
                 '<td>' + Diary.cellText(m.weight) + '</td>' +
@@ -1380,7 +1400,21 @@ var Diary = {
     /* Строка считается заполненной, если есть время и хотя бы один показатель */
     rowHasValues: function (m) {
         if (!m) return false;
-        return !!(m.ad_top || m.ad_bottom || m.pulse || m.sugar || m.temperature || m.weight);
+        return !!(m.ad_top || m.ad_bottom || m.pulse || m.spo2 ||
+            m.sugar || m.temperature || m.weight);
+    },
+
+    /* ----------------------------------------------------------------------
+     * Валидация №17: уровни тревожности сатурации (ТЗ раздел 2.4).
+     * Возвращает текст предупреждения или пустую строку, если всё в норме.
+     * Значения вне 85–100 отсекаются раньше проверкой диапазона.
+     * -------------------------------------------------------------------- */
+    spo2Alert: function (v) {
+        if (v === null || v === undefined || isNaN(v)) return '';
+        if (v < 88) return 'КРИТИЧЕСКИ НИЗКАЯ САТУРАЦИЯ! Требуется помощь!';
+        if (v < 92) return 'НИЗКАЯ САТУРАЦИЯ! Проверьте кислород!';
+        if (v < 95) return 'Сатурация низкая, рекомендуется контроль';
+        return '';
     },
 
     filledCount: function (list) {

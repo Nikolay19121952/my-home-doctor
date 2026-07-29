@@ -341,7 +341,8 @@
 
 .dv-table {
     width: 100%;
-    min-width: 620px;
+    /* 9 колонок (v2.2: добавлена SpO2) — на узком экране таблица прокручивается */
+    min-width: 700px;
     border-collapse: collapse;
     font-size: 15px;
 }

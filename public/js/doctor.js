@@ -432,16 +432,14 @@ var Doctor = {
             var textForBtns = fullText || text;
             var btnWrap = document.createElement('div');
             btnWrap.className = 'chat-bubble-actions';
+            // v2.2: одна кнопка вместо двух — обе открывали один и тот же
+            // диалог браузера, где выбирается принтер или «Сохранить как PDF»
             var printBtn = document.createElement('button');
             printBtn.className = 'btn btn-outline btn-print';
-            printBtn.innerHTML = '🖨️ Печать';
-            printBtn.onclick = function () { Doctor.printReport(textForBtns); };
-            var fileBtn = document.createElement('button');
-            fileBtn.className = 'btn btn-outline btn-print';
-            fileBtn.innerHTML = '💾 Файл';
-            fileBtn.onclick = function () { Doctor.saveReportToFile(textForBtns); };
+            printBtn.innerHTML = '🖨️ Печать / 💾 Файл';
+            printBtn.title = 'Печать или сохранение в PDF';
+            printBtn.onclick = function () { Doctor.saveReportToFile(textForBtns); };
             btnWrap.appendChild(printBtn);
-            btnWrap.appendChild(fileBtn);
             bubble.appendChild(btnWrap);
         }
 
