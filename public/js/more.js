@@ -554,7 +554,62 @@ var More = {
         a.click();
         document.body.removeChild(a);
         setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+
+        // Запоминаем дату копии — по ней дневник напомнит, когда пора снова
+        localStorage.setItem(More.BACKUP_KEY, new Date().toISOString());
+        sessionStorage.removeItem('mdd_backup_hidden');
+
         UI.showToast('Экспорт готов! Файл загружается...', 3000);
+    },
+
+    BACKUP_KEY: 'mdd_last_backup',
+    BACKUP_DAYS: 14,   // через сколько дней напоминать
+
+    /* ------------------------------------------------------------------
+     * НАПОМИНАНИЕ О РЕЗЕРВНОЙ КОПИИ
+     * Все данные приложения живут только в браузере. Если его почистить
+     * или сменить устройство — дневник и консультации пропадут. Поэтому
+     * дневник показывает полоску, когда копия давно не делалась.
+     * ---------------------------------------------------------------- */
+
+    /* Сколько дней прошло с последней копии; null — если копий не было */
+    daysSinceBackup: function () {
+        var iso = localStorage.getItem(More.BACKUP_KEY);
+        if (!iso) return null;
+        var then = new Date(iso).getTime();
+        if (isNaN(then)) return null;
+        return Math.floor((Date.now() - then) / 86400000);
+    },
+
+    /* Нужно ли показывать напоминание прямо сейчас */
+    backupDue: function () {
+        // Не тревожим, пока данных почти нет
+        var days = Object.keys(Diary.getRecords()).length;
+        if (days < 3) return false;
+        if (sessionStorage.getItem('mdd_backup_hidden')) return false;
+
+        var since = More.daysSinceBackup();
+        return since === null || since >= More.BACKUP_DAYS;
+    },
+
+    /* Текст полоски */
+    backupText: function () {
+        var since = More.daysSinceBackup();
+        if (since === null) return 'Резервная копия данных ещё ни разу не сохранялась.';
+        return 'Последняя резервная копия сделана ' + since +
+            Diary.plural(since, ' день', ' дня', ' дней') + ' назад.';
+    },
+
+    /* Кнопка «Сохранить копию» прямо из дневника */
+    backupNow: function () {
+        More.exportData();
+        if (App.currentPage === 'diary') Diary.renderList();
+    },
+
+    /* Кнопка «Позже» — прячем до следующего открытия приложения */
+    backupLater: function () {
+        sessionStorage.setItem('mdd_backup_hidden', '1');
+        if (App.currentPage === 'diary') Diary.renderList();
     },
 
     /* Приводит файл любого из прежних форматов к единому виду.

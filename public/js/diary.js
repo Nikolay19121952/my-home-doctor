@@ -217,6 +217,18 @@ var Diary = {
             (allDays.length === 1 ? ' записи' : ' записей') + '</p>' +
             '</div>';
 
+        // Напоминание о резервной копии — данные хранятся только в браузере
+        if (More.backupDue()) {
+            html += '<div class="dv-backup">' +
+                '<div class="dv-backup-text">💾 ' + UI.escapeHtml(More.backupText()) +
+                '<br><span class="dv-muted">Все записи хранятся только в этом браузере. ' +
+                'Сохраните копию, чтобы не потерять их.</span></div>' +
+                '<div class="dv-backup-btns">' +
+                '<button class="btn btn-primary btn-small" onclick="More.backupNow()">Сохранить копию</button>' +
+                '<button class="btn btn-outline btn-small" onclick="More.backupLater()">Позже</button>' +
+                '</div></div>';
+        }
+
         // Незавершённый черновик — заметная подсказка вернуться к нему
         if (current && current.date) {
             var filled = Diary.filledCount(current.measurements);
@@ -280,6 +292,19 @@ var Diary = {
                     Math.min(Diary._listOffset + 10, days.length) + ' из ' + days.length +
                     '. Листайте кнопками ⬆️ ⬇️.</p>';
             }
+
+            // Пояснение к цветным отметкам — показываем, только если они есть
+            var hasFlags = false;
+            for (var f = 0; f < pageDays.length; f++) {
+                if (Diary.dayLevel(records[pageDays[f]])) { hasFlags = true; break; }
+            }
+            if (hasFlags) {
+                html += '<p class="dv-legend">⚠️ Отмечены дни, где показатели выходили ' +
+                    'за обычные границы: <span class="dv-val dv-val-warn">жёлтым</span> — ' +
+                    'стоит обратить внимание, <span class="dv-val dv-val-danger">красным</span> — ' +
+                    'отклонение значительное. Это справочная подсказка, а не диагноз — ' +
+                    'оценить показатели может только врач.</p>';
+            }
         }
 
         host.innerHTML = html;
@@ -292,24 +317,36 @@ var Diary = {
         if (last) {
             brief = 'Последнее: ' + UI.escapeHtml(last.time || '--:--');
             var vals = [];
-            if (last.ad_top && last.ad_bottom) vals.push('АД ' + last.ad_top + '/' + last.ad_bottom);
-            if (last.pulse) vals.push('пульс ' + last.pulse);
-            if (last.spo2) vals.push('SpO2 ' + last.spo2 + '%');
-            if (last.sugar) vals.push('сахар ' + last.sugar);
-            if (last.temperature) vals.push('t° ' + last.temperature);
+            if (last.ad_top && last.ad_bottom) {
+                vals.push(Diary.mark('ad', [last.ad_top, last.ad_bottom],
+                    'АД ' + last.ad_top + '/' + last.ad_bottom));
+            }
+            if (last.pulse) vals.push(Diary.mark('pulse', last.pulse, 'пульс ' + last.pulse));
+            if (last.spo2) vals.push(Diary.mark('spo2', last.spo2, 'SpO2 ' + last.spo2 + '%'));
+            if (last.sugar) vals.push(Diary.mark('sugar', last.sugar, 'сахар ' + last.sugar));
+            if (last.temperature) vals.push(Diary.mark('temp', last.temperature, 't° ' + last.temperature));
             if (last.weight) vals.push('вес ' + last.weight);
-            if (vals.length) brief += ' (' + UI.escapeHtml(vals.join(', ')) + ')';
+            if (vals.length) brief += ' (' + vals.join(', ') + ')';
         }
         var count = Diary.filledCount(rec.measurements);
         var checked = Diary._selectedDays.indexOf(rec.date) !== -1;
 
-        return '<div class="dv-item">' +
+        // Отметка дня: были ли за сутки значения вне обычных границ
+        var level = Diary.dayLevel(rec);
+        var flag = '';
+        if (level === 'danger') {
+            flag = ' <span class="dv-flag dv-flag-danger" title="Есть значения, сильно выходящие за обычные границы">⚠️</span>';
+        } else if (level === 'warn') {
+            flag = ' <span class="dv-flag dv-flag-warn" title="Есть значения выше или ниже обычных границ">⚠️</span>';
+        }
+
+        return '<div class="dv-item' + (level ? ' dv-item-' + level : '') + '">' +
             '<label class="dv-check">' +
             '<input type="checkbox" ' + (checked ? 'checked' : '') +
             ' onchange="Diary.toggleDay(\'' + rec.date + '\', this.checked)">' +
             '<span></span></label>' +
             '<div class="dv-item-body">' +
-            '<div class="dv-item-date">' + UI.escapeHtml(Diary.formatDay(rec.date)) +
+            '<div class="dv-item-date">' + UI.escapeHtml(Diary.formatDay(rec.date)) + flag +
             ' <span class="dv-badge">' + count + Diary.plural(count, ' измерение', ' измерения', ' измерений') + '</span></div>' +
             '<div class="dv-item-brief">' + brief + '</div>' +
             '</div>' +
@@ -1303,6 +1340,72 @@ var Diary = {
         if (!m) return false;
         return !!(m.ad_top || m.ad_bottom || m.pulse || m.spo2 ||
             m.sugar || m.temperature || m.weight);
+    },
+
+    /* ======================================================================
+     * ПОДСВЕТКА ЗНАЧЕНИЙ ВНЕ ОБЫЧНЫХ ГРАНИЦ
+     *
+     * Границы взяты как общепринятые справочные, а не как диагноз: у каждого
+     * пациента своя норма, и решает всегда врач. Отметка нужна лишь чтобы
+     * в длинном списке дней сразу было видно, куда стоит заглянуть.
+     *
+     * Возвращает '' (в границах), 'warn' (обратить внимание) или
+     * 'danger' (значительное отклонение).
+     * ==================================================================== */
+    LIMITS: {
+        // [нижняя граница danger, нижняя warn, верхняя warn, верхняя danger]
+        ad_top: [90, 100, 140, 180],
+        ad_bottom: [60, 65, 90, 110],
+        pulse: [40, 50, 90, 120],
+        spo2: [88, 92, 999, 999],
+        sugar: [3.0, 3.9, 6.1, 7.8],
+        temp: [35.0, 35.5, 37.1, 38.5]
+    },
+
+    level: function (field, value) {
+        var lim = Diary.LIMITS[field];
+        if (!lim || value === null || value === undefined || value === '') return '';
+        if (value < lim[0] || value > lim[3]) return 'danger';
+        if (value < lim[1] || value > lim[2]) return 'warn';
+        return '';
+    },
+
+    /* Оборачивает текст значения в цветную метку, если оно вне границ.
+       Для давления на вход приходит пара [верхнее, нижнее]. */
+    mark: function (field, value, text) {
+        var lvl;
+        if (field === 'ad') {
+            var top = Diary.level('ad_top', value[0]);
+            var bottom = Diary.level('ad_bottom', value[1]);
+            lvl = (top === 'danger' || bottom === 'danger') ? 'danger'
+                : ((top || bottom) ? 'warn' : '');
+        } else {
+            lvl = Diary.level(field, value);
+        }
+        var safe = UI.escapeHtml(text);
+        return lvl ? '<span class="dv-val dv-val-' + lvl + '">' + safe + '</span>' : safe;
+    },
+
+    /* Худший уровень за весь день — по всем измерениям сразу */
+    dayLevel: function (rec) {
+        if (!rec || !rec.measurements) return '';
+        var worst = '';
+        for (var i = 0; i < rec.measurements.length; i++) {
+            var m = rec.measurements[i];
+            var checks = [
+                Diary.level('ad_top', m.ad_top),
+                Diary.level('ad_bottom', m.ad_bottom),
+                Diary.level('pulse', m.pulse),
+                Diary.level('spo2', m.spo2),
+                Diary.level('sugar', m.sugar),
+                Diary.level('temp', m.temperature)
+            ];
+            for (var j = 0; j < checks.length; j++) {
+                if (checks[j] === 'danger') return 'danger';
+                if (checks[j] === 'warn') worst = 'warn';
+            }
+        }
+        return worst;
     },
 
     /* ----------------------------------------------------------------------

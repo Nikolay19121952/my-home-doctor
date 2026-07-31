@@ -66,6 +66,85 @@
     flex: 1 1 200px;
 }
 
+/* --- Напоминание о резервной копии --------------------------------------- */
+.dv-backup {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    background: var(--color-primary-light);
+    border: 2px solid var(--color-primary);
+    border-radius: var(--radius);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.dv-backup-text {
+    flex: 1 1 220px;
+    font-size: var(--font-size-small);
+    font-weight: 600;
+}
+
+.dv-backup-text .dv-muted {
+    font-weight: 400;
+}
+
+.dv-backup-btns {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
+}
+
+/* Кнопки полноразмерные: раздел рассчитан на пожилых пользователей,
+   мелкие цели на смартфоне неудобны */
+.dv-backup-btns .btn {
+    min-height: var(--touch-min);
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-small);
+}
+
+/* --- Отметки значений вне обычных границ --------------------------------- */
+.dv-val {
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-weight: 600;
+}
+
+.dv-val-warn {
+    background: #FFF3C4;
+    color: #7A4F00;
+}
+
+.dv-val-danger {
+    background: #FFD5D5;
+    color: #B71C1C;
+}
+
+.dv-flag {
+    font-size: 17px;
+    vertical-align: middle;
+}
+
+.dv-item-warn {
+    border-left: 5px solid #FFA500;
+}
+
+.dv-item-danger {
+    border-left: 5px solid var(--color-danger);
+}
+
+.dv-legend {
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+
 /* --- Фильтр по периоду (кнопка №1) --------------------------------------- */
 .dv-filter {
     background: var(--color-card);
