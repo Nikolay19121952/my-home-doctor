@@ -1,0 +1,390 @@
+/* ============================================================================
+   ГРАФИКИ ИЗМЕРЕНИЙ v3.0 — макеты №5 и №6 (ТЗ раздел 3)
+
+   Цвета взяты из ТЗ, но размеры кнопок и шрифтов согласованы с приложением:
+   сенсорные цели 48px и базовый шрифт 18px вместо предложенных в ТЗ 14px —
+   раздел рассчитан на пожилых пользователей.
+   ========================================================================== */
+
+/* --- МАКЕТ №5: окно выбора параметра ------------------------------------- */
+.gr-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: var(--spacing-md);
+    z-index: 1000;
+}
+
+.gr-window {
+    background: var(--color-card);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    width: 100%;
+    max-width: 460px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.gr-mhead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.gr-mhead h3 {
+    margin: 0;
+    font-size: var(--font-size-base);
+}
+
+.gr-close {
+    min-width: 44px;
+    min-height: 44px;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 22px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+}
+
+.gr-close:hover,
+.gr-close:focus {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.gr-mbody {
+    padding: var(--spacing-md);
+    overflow-y: auto;
+}
+
+.gr-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.gr-option {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    min-height: var(--touch-min);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+    user-select: none;
+}
+
+.gr-option:hover {
+    background: #E6F2FF;
+    border-color: var(--color-primary);
+}
+
+.gr-option input[type="radio"] {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    accent-color: var(--color-primary);
+    flex-shrink: 0;
+}
+
+.gr-option-text {
+    display: flex;
+    flex-direction: column;
+    font-size: var(--font-size-small);
+    font-weight: 600;
+}
+
+.gr-option-hint {
+    font-weight: 400;
+    font-size: 15px;
+    color: var(--color-text-secondary);
+}
+
+.gr-mfoot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    border-top: 1px solid var(--color-border);
+}
+
+/* --- МАКЕТ №6: страница графика ------------------------------------------ */
+.gr-head {
+    margin-bottom: var(--spacing-md);
+}
+
+.gr-title {
+    font-size: var(--font-size-large);
+    margin: 0;
+}
+
+.gr-period {
+    font-size: var(--font-size-base);
+    color: var(--color-text-secondary);
+    margin-top: 4px;
+}
+
+.gr-param {
+    font-size: var(--font-size-small);
+    color: var(--color-primary-dark);
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.gr-shot {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--spacing-md);
+}
+
+.gr-canvas-box {
+    position: relative;
+    height: 340px;
+    width: 100%;
+}
+
+#gr-canvas {
+    max-width: 100%;
+}
+
+/* --- Статистика ---------------------------------------------------------- */
+.gr-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--color-border);
+}
+
+.gr-stat {
+    text-align: center;
+}
+
+.gr-stat-label {
+    display: block;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+}
+
+.gr-stat-value {
+    display: block;
+    font-size: var(--font-size-large);
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+/* --- Таблица значений ---------------------------------------------------- */
+.gr-toggle {
+    width: 100%;
+    min-height: var(--touch-min);
+    margin-top: var(--spacing-sm);
+    background: none;
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-primary);
+    font-family: inherit;
+    font-size: var(--font-size-small);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.gr-toggle:hover,
+.gr-toggle:focus {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.gr-tablewrap {
+    margin-top: var(--spacing-xs);
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-card);
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.gr-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-small);
+}
+
+.gr-table th {
+    position: sticky;
+    top: 0;
+    background: #0066CC;
+    color: #fff;
+    border: 1px solid #CCCCCC;
+    padding: 8px 6px;
+    text-align: center;
+    font-size: 15px;
+}
+
+.gr-table td {
+    border: 1px solid #CCCCCC;
+    padding: 7px 6px;
+    text-align: center;
+}
+
+.gr-table tr:nth-child(even) td {
+    background: #F9F9F9;
+}
+
+/* --- Кнопки страницы графика --------------------------------------------- */
+.gr-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-md);
+}
+
+.gr-buttons .btn {
+    flex: 1 1 180px;
+}
+
+/* --- Лист для выгрузки в PDF ---------------------------------------------
+   Показывается за пределами экрана: html2canvas снимает его в картинку,
+   а пользователь этого не видит.
+   ------------------------------------------------------------------------ */
+.gr-sheet {
+    position: fixed;
+    left: -10000px;
+    top: 0;
+    width: 780px;
+    background: #FFFFFF;
+    color: #222222;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 28px;
+}
+
+.gr-sheet-head {
+    text-align: center;
+    border-bottom: 2px solid #0066CC;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+}
+
+.gr-sheet-head h1 {
+    margin: 0;
+    font-size: 20px;
+    color: #0066CC;
+}
+
+.gr-sheet-head h2 {
+    margin: 6px 0 8px;
+    font-size: 16px;
+    color: #0D47A1;
+}
+
+.gr-sheet-head p {
+    margin: 2px 0;
+    font-size: 13px;
+}
+
+.gr-sheet-patient {
+    background: #E6F2FF;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    font-size: 12px;
+}
+
+.gr-sheet-chart {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.gr-sheet-chart img {
+    width: 100%;
+    max-width: 720px;
+}
+
+.gr-sheet-stats {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 18px;
+}
+
+.gr-sheet-stats td {
+    border: 1px solid #CCCCCC;
+    padding: 8px;
+    text-align: center;
+    font-size: 13px;
+    background: #F5F5F5;
+}
+
+.gr-sheet h3 {
+    font-size: 15px;
+    color: #0066CC;
+    margin: 0 0 8px;
+}
+
+.gr-sheet-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.gr-sheet-table th {
+    background: #0066CC;
+    color: #fff;
+    border: 1px solid #CCCCCC;
+    padding: 6px;
+    text-align: center;
+}
+
+.gr-sheet-table td {
+    border: 1px solid #CCCCCC;
+    padding: 5px 6px;
+    text-align: center;
+}
+
+.gr-sheet-table tr:nth-child(even) td {
+    background: #F9F9F9;
+}
+
+.gr-sheet-foot {
+    margin-top: 18px;
+    padding-top: 10px;
+    border-top: 1px solid #DDDDDD;
+    text-align: center;
+    color: #999999;
+    font-size: 11px;
+}
+
+/* --- Адаптив для смартфона ----------------------------------------------- */
+@media (max-width: 600px) {
+    .gr-canvas-box {
+        height: 300px;
+    }
+
+    .gr-stats {
+        grid-template-columns: 1fr 1fr;
+        gap: var(--spacing-sm);
+    }
+
+    .gr-buttons .btn {
+        flex: 1 1 100%;
+    }
+}

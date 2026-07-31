@@ -36,6 +36,10 @@ var App = {
         if (pageId === 'profile-form' || pageId === 'profile-view') {
             navPage = 'profiles';
         }
+        // Страница графика открывается из дневника — подсвечиваем «Дневник»
+        if (pageId === 'graphs') {
+            navPage = 'diary';
+        }
 
         var navBtns = document.querySelectorAll('.nav-btn');
         for (var j = 0; j < navBtns.length; j++) {

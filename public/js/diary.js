@@ -249,6 +249,7 @@ var Diary = {
             Diary.panelBtn('3', '⬇️', 'Прокрутить вниз', 'Diary.scrollList(1)') +
             Diary.panelBtn('4', '📝', 'Запись измерений', 'Diary.openForm()', 'dv-btn-main') +
             Diary.panelBtn('5', '💬', 'История чата', 'Diary.show(\'chat\')') +
+            Diary.panelBtn('6', '📈', 'Создать график', 'Graphs.start()') +
             '</div>';
 
         // Кнопка консультации — появляется, когда отмечены дни
