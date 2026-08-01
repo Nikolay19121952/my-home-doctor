@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="css/diary.css">
     <link rel="stylesheet" href="css/about.css">
     <link rel="stylesheet" href="css/graphs.css">
+    <link rel="stylesheet" href="css/period.css">
 </head>
 <body>
 
@@ -35,6 +36,15 @@
                     <h2>Добро пожаловать!</h2>
                     <p>Это ваш персональный помощник для ведения медицинской карты семьи.</p>
                 </div>
+
+                <!-- Быстрая запись измерения (ТЗ v3.1, доработка №1) -->
+                <button class="btn-quick-record" onclick="Diary.quickRecord()">
+                    <span class="btn-quick-icon">➕</span>
+                    <span class="btn-quick-body">
+                        <span class="btn-quick-title">Записать измерение</span>
+                        <span class="btn-quick-desc">Давление, пульс, сахар — за сегодня</span>
+                    </span>
+                </button>
 
                 <div class="quick-actions">
                     <h3>Быстрые действия</h3>
@@ -340,6 +350,7 @@
     <script src="js/doctor.js"></script>
     <script src="js/diary.js"></script>
     <script src="js/graphs.js"></script>
+    <script src="js/period.js"></script>
     <script src="js/more.js"></script>
     <script src="js/app.js"></script>
 </body>

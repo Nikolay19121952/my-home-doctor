@@ -262,6 +262,7 @@ var Diary = {
             Diary.panelBtn('4', '📝', 'Запись измерений', 'Diary.openForm()', 'dv-btn-main') +
             Diary.panelBtn('5', '💬', 'История чата', 'Diary.show(\'chat\')') +
             Diary.panelBtn('6', '📈', 'Создать график', 'Graphs.start()') +
+            Diary.panelBtn('7', '🖨️', 'Печать периода', 'Period.print()') +
             '</div>';
 
         // Кнопка консультации — появляется, когда отмечены дни
@@ -444,11 +445,120 @@ var Diary = {
         Diary._editingDay = null;
         Diary._rowOffset = 0;
         Diary._dirty = false;
+        Diary._returnTo = 'list';
         Diary.show('form');
     },
 
+    /* ----------------------------------------------------------------------
+     * БЫСТРАЯ ЗАПИСЬ (ТЗ v3.1, доработка №1)
+     *
+     * Открывает запись за сегодня, подставляет текущее время в первую
+     * свободную строку и ставит в неё курсор. Раньше на одно измерение
+     * уходило 8–10 действий, теперь 4–5.
+     * -------------------------------------------------------------------- */
+    quickRecord: function () {
+        var today = Diary.todayISO();
+        var records = Diary.getRecords();
+
+        if (records[today]) {
+            // Запись за сегодня уже завершена — открываем её на дополнение
+            Diary.openRecord(today, 'home');
+        } else {
+            var draft = Diary.getCurrent();
+
+            // Черновик за другой день не трогаем (условие 3 раздела 2.4 ТЗ)
+            if (draft && draft.date && draft.date !== today &&
+                Diary.filledCount(draft.measurements) > 0) {
+                UI.showToast('Сначала завершите запись за ' + Diary.formatDay(draft.date), 4000);
+                App.navigateTo('diary');
+                Diary.show('list');
+                return;
+            }
+
+            Diary._current = (draft && draft.date === today)
+                ? draft
+                : Diary.blankRecord(today);
+            Diary._current.date = today;
+            Diary._editingDay = null;
+            Diary._returnTo = 'home';
+            Diary._dirty = false;
+            Diary.saveCurrent(Diary._current);
+        }
+
+        App.navigateTo('diary');
+        Diary.prepareQuickRow();
+    },
+
+    /* Готовит первую свободную строку: время, прокрутка, курсор, подсветка */
+    prepareQuickRow: function () {
+        var rec = Diary._current;
+        if (!rec) return;
+
+        var row = Diary.firstFreeRow(rec.measurements);
+
+        // Валидация: в сутках не больше 36 измерений
+        if (row === -1) {
+            UI.showToast('Лимит 36 измерений за день достигнут. Завершите запись!', 4000);
+            Diary.show('form');
+            return;
+        }
+
+        // Дописываем строки до нужной и ставим текущее время
+        while (rec.measurements.length <= row) {
+            rec.measurements.push({
+                id: rec.measurements.length + 1,
+                time: '', ad_top: null, ad_bottom: null, pulse: null, spo2: null,
+                sugar: null, temperature: null, weight: null, notes: ''
+            });
+        }
+        if (!rec.measurements[row].time) {
+            rec.measurements[row].time = Diary.nowHHMM();
+        }
+        Diary.saveCurrent(rec);
+
+        // Показываем страницу таблицы, на которой находится эта строка
+        Diary._rowOffset = Math.floor(row / Diary.VISIBLE_ROWS) * Diary.VISIBLE_ROWS;
+        Diary._quickRow = row;
+        Diary.show('form');
+
+        // Подсветка и курсор — после отрисовки таблицы
+        setTimeout(function () {
+            var tr = document.querySelector('.dv-table tr[data-row="' + row + '"]');
+            if (tr) {
+                tr.classList.add('dv-row-new');
+                if (tr.scrollIntoView) {
+                    tr.scrollIntoView({ block: 'center' });
+                }
+            }
+            Diary.focusCell(row, 'ad_top');
+        }, 60);
+    },
+
+    /* Индекс первой строки без времени; -1 — если все 36 заняты */
+    firstFreeRow: function (list) {
+        for (var i = 0; i < Diary.MAX_ROWS; i++) {
+            var m = list[i];
+            if (!m || !m.time) return i;
+        }
+        return -1;
+    },
+
+    todayISO: function () {
+        var d = new Date();
+        return d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+    },
+
+    /* Текущее время без округления — момент измерения важен */
+    nowHHMM: function () {
+        var d = new Date();
+        return String(d.getHours()).padStart(2, '0') + ':' +
+            String(d.getMinutes()).padStart(2, '0');
+    },
+
     /* Открыть готовую запись на редактирование (кнопка «Откр.») */
-    openRecord: function (day) {
+    openRecord: function (day, returnTo) {
         var records = Diary.getRecords();
         var rec = records[day];
         if (!rec) return;
@@ -468,7 +578,8 @@ var Diary = {
         Diary._editingDay = day;
         Diary._rowOffset = 0;
         Diary._dirty = false;
-        Diary.show('form');
+        Diary._returnTo = returnTo || 'list';
+        if (returnTo !== 'home') Diary.show('form');
     },
 
     blankRecord: function (date) {
@@ -863,8 +974,24 @@ var Diary = {
 
         Diary.saveCurrent(rec);
         Diary._dirty = false;
-        UI.showToast('Сохранено!');
-        Diary.show('list');
+        UI.showToast('Измерение сохранено!');
+        Diary.leave();
+    },
+
+    /* ----------------------------------------------------------------------
+     * Куда возвращаться после сохранения. Если запись начата кнопкой
+     * быстрой записи с главного экрана, туда же и возвращаемся: пользователь
+     * пришёл оттуда и может сразу записать следующее измерение.
+     * -------------------------------------------------------------------- */
+    leave: function () {
+        var to = Diary._returnTo;
+        Diary._returnTo = 'list';
+        Diary._quickRow = -1;
+        if (to === 'home') {
+            App.navigateTo('home');
+        } else {
+            Diary.show('list');
+        }
     },
 
     /* --- Кнопка №5: завершить запись -------------------------------------- */
@@ -909,7 +1036,8 @@ var Diary = {
         Diary._dirty = false;
 
         UI.showToast('Запись завершена и сохранена!');
-        Diary.show('list');
+        Diary._returnTo = 'list';
+        Diary.leave();
 
         // Печать записи (PDF через браузер) — после возврата в список
         setTimeout(function () { Diary.printRecord(records[rec.date].date); }, 400);
@@ -934,8 +1062,8 @@ var Diary = {
         Diary._current = null;
         Diary._editingDay = null;
         Diary._dirty = false;
-        if (!silent) UI.showToast('Сохранено!');
-        Diary.show('list');
+        if (!silent) UI.showToast('Измерение сохранено!');
+        Diary.leave();
     },
 
     /* Выход из формы кнопкой «Назад» — валидация №14 */
@@ -949,14 +1077,14 @@ var Diary = {
                     Diary._dirty = false;
                     Diary._current = null;
                     Diary._editingDay = null;
-                    Diary.show('list');
+                    Diary.leave();
                 }
             );
             return;
         }
         Diary._current = null;
         Diary._editingDay = null;
-        Diary.show('list');
+        Diary.leave();
     },
 
     deleteRecord: function (day) {

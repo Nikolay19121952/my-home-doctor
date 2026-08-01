@@ -66,6 +66,67 @@
     flex: 1 1 200px;
 }
 
+/* --- Кнопка быстрой записи на главном экране ----------------------------- */
+.btn-quick-record {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    min-height: 68px;
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--color-primary);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.2s;
+}
+
+.btn-quick-record:hover,
+.btn-quick-record:focus {
+    background: var(--color-primary-dark);
+}
+
+.btn-quick-record:active {
+    transform: scale(0.99);
+}
+
+.btn-quick-icon {
+    font-size: 28px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.btn-quick-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.btn-quick-title {
+    font-size: var(--font-size-large);
+    font-weight: 700;
+}
+
+.btn-quick-desc {
+    font-size: var(--font-size-small);
+    opacity: 0.9;
+}
+
+/* Подсветка строки, куда подставлено текущее время.
+   Голубая, а не жёлтая: жёлтый в таблице означает предупреждение. */
+.dv-row-new td {
+    background: #E6F2FF;
+    animation: dv-row-fade 3s ease-out forwards;
+}
+
+@keyframes dv-row-fade {
+    0% { background: #CFE6FF; }
+    100% { background: transparent; }
+}
+
 /* --- Напоминание о резервной копии --------------------------------------- */
 .dv-backup {
     display: flex;
