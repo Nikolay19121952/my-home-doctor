@@ -38,6 +38,60 @@ var Profiles = {
         });
     },
 
+    /* ----------------------------------------------------------------------
+     * ВЫБОР АКТИВНОГО ПРОФИЛЯ (ТЗ v3.1 часть 1, пункт 3.1)
+     *
+     * Дневник, консультации и графики принадлежат конкретному члену семьи.
+     * Здесь выбирается, чьи данные показывает приложение.
+     * -------------------------------------------------------------------- */
+    switchProfile: function (id) {
+        if (!id || id === Storage.getActiveId()) return;
+
+        var name = '';
+        var profiles = Storage.getProfiles();
+        for (var i = 0; i < profiles.length; i++) {
+            if (profiles[i].id === id) name = profiles[i].name;
+        }
+
+        Storage.setActiveId(id);
+
+        // Сбрасываем то, что относилось к прежнему профилю
+        Diary._current = null;
+        Diary._editingDay = null;
+        Diary._selectedDays = [];
+        Diary._dirty = false;
+        Diary.view = 'list';
+        if (typeof Graphs !== 'undefined' && Graphs._chart) {
+            Graphs._chart.destroy();
+            Graphs._chart = null;
+            Graphs._meta = null;
+        }
+
+        Profiles.renderList();
+        Doctor.renderHistory();
+        Doctor.updateTitle();
+        UI.showToast('Активный профиль: ' + name, 3000);
+    },
+
+    activeSelector: function (profiles) {
+        var activeId = Storage.getActiveId();
+        var html = '<div class="profile-active">' +
+            '<label for="active-profile">Активный профиль</label>' +
+            '<select id="active-profile" onchange="Profiles.switchProfile(this.value)">';
+
+        for (var i = 0; i < profiles.length; i++) {
+            var p = profiles[i];
+            html += '<option value="' + UI.escapeHtml(p.id) + '"' +
+                (p.id === activeId ? ' selected' : '') + '>' +
+                UI.escapeHtml(p.name) + '</option>';
+        }
+
+        html += '</select>' +
+            '<p class="profile-active-hint">Дневник, консультации и графики показываются ' +
+            'для выбранного члена семьи.</p></div>';
+        return html;
+    },
+
     renderList: function () {
         var profiles = Storage.getProfiles();
         var listEl = document.getElementById('profiles-list');
@@ -50,7 +104,10 @@ var Profiles = {
         }
 
         emptyEl.style.display = 'none';
-        var html = '';
+
+        // Переключатель показываем, только когда есть из кого выбирать
+        var html = profiles.length > 1 ? Profiles.activeSelector(profiles) : '';
+        var activeId = Storage.getActiveId();
         for (var i = 0; i < profiles.length; i++) {
             var p = profiles[i];
             var age = UI.calculateAge(p.birthDate);
@@ -59,11 +116,14 @@ var Profiles = {
             var info = p.chronicConditions ? UI.escapeHtml(p.chronicConditions) : '';
             if (info.length > 60) info = info.substring(0, 60) + '...';
 
-            html += '<div class="profile-card" data-id="' + UI.escapeHtml(p.id) + '" tabindex="0" role="button">';
+            var isActive = p.id === activeId;
+            html += '<div class="profile-card' + (isActive ? ' profile-card-active' : '') +
+                '" data-id="' + UI.escapeHtml(p.id) + '" tabindex="0" role="button">';
             html += '  <div class="profile-card-header">';
             html += '    <div class="profile-avatar">' + avatar + '</div>';
             html += '    <div>';
-            html += '      <div class="profile-card-name">' + UI.escapeHtml(p.name) + '</div>';
+            html += '      <div class="profile-card-name">' + UI.escapeHtml(p.name) +
+                (isActive && profiles.length > 1 ? ' <span class="profile-badge">активный</span>' : '') + '</div>';
             html += '      <div class="profile-card-age">' + (age !== null ? UI.pluralAge(age) : '') + '</div>';
             html += '    </div>';
             html += '  </div>';
@@ -192,12 +252,18 @@ var Profiles = {
             Storage.updateProfile(Profiles.editingId, data);
             UI.showToast('Профиль обновлён');
         } else {
+            var wasEmpty = Storage.getProfiles().length === 0;
             Storage.addProfile(data);
+            // Первому созданному профилю отходят данные, записанные
+            // до того, как в приложении появились карточки семьи
+            if (wasEmpty) Storage.migrateToProfiles();
             UI.showToast('Профиль добавлен');
         }
 
         Profiles.editingId = null;
         Profiles.renderList();
+        Doctor.renderHistory();
+        Doctor.updateTitle();
         App.navigateTo('profiles');
     },
 
@@ -211,9 +277,19 @@ var Profiles = {
             'Профиль «' + profile.name + '» будет удалён. Это действие нельзя отменить.',
             'Удалить',
             function () {
-                Storage.deleteProfile(Profiles.editingId);
+                var id = Profiles.editingId;
+                Storage.deleteProfile(id);
+                Storage.dropProfileData(id);   // вместе с профилем удаляем его дневник и чат
+
+                // Если удалили активного — активным станет первый оставшийся
+                if (localStorage.getItem(Storage.ACTIVE_KEY) === id) {
+                    localStorage.removeItem(Storage.ACTIVE_KEY);
+                }
+
                 Profiles.editingId = null;
                 Profiles.renderList();
+                Doctor.renderHistory();
+                Doctor.updateTitle();
                 App.navigateTo('profiles');
                 UI.showToast('Профиль удалён');
             }

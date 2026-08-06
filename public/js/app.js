@@ -2,6 +2,10 @@ var App = {
     currentPage: 'home',
 
     init: function () {
+        // Данные, накопленные до разделения по членам семьи,
+        // отходят первому профилю в списке
+        Storage.migrateToProfiles();
+
         App.initNavigation();
         Profiles.init();
         Profiles.renderList();

@@ -1,4 +1,4 @@
-/* ============================================================================
+﻿/* ============================================================================
    ГРАФИКИ ИЗМЕРЕНИЙ v3.0 — макеты №5 и №6 (ТЗ раздел 3)
 
    Цвета взяты из ТЗ, но размеры кнопок и шрифтов согласованы с приложением:
@@ -262,116 +262,11 @@
 }
 
 /* --- Лист для выгрузки в PDF ---------------------------------------------
-   Показывается за пределами экрана: html2canvas снимает его в картинку,
-   а пользователь этого не видит.
+   Оформление печатного листа перенесено в graphs.js (функция sheetCss):
+   html2canvas рисует копию страницы в отдельном окне и на смартфоне
+   не успевал подтянуть внешний CSS — документ выходил без оформления,
+   а картинка графика вылезала за правый край в натуральном размере.
    ------------------------------------------------------------------------ */
-.gr-sheet {
-    position: fixed;
-    left: -10000px;
-    top: 0;
-    width: 780px;
-    background: #FFFFFF;
-    color: #222222;
-    font-family: Arial, sans-serif;
-    font-size: 13px;
-    line-height: 1.5;
-    padding: 28px;
-}
-
-.gr-sheet-head {
-    text-align: center;
-    border-bottom: 2px solid #0066CC;
-    padding-bottom: 12px;
-    margin-bottom: 16px;
-}
-
-.gr-sheet-head h1 {
-    margin: 0;
-    font-size: 20px;
-    color: #0066CC;
-}
-
-.gr-sheet-head h2 {
-    margin: 6px 0 8px;
-    font-size: 16px;
-    color: #0D47A1;
-}
-
-.gr-sheet-head p {
-    margin: 2px 0;
-    font-size: 13px;
-}
-
-.gr-sheet-patient {
-    background: #E6F2FF;
-    border-radius: 6px;
-    padding: 10px 14px;
-    margin-bottom: 14px;
-    font-size: 12px;
-}
-
-.gr-sheet-chart {
-    text-align: center;
-    margin-bottom: 16px;
-}
-
-.gr-sheet-chart img {
-    width: 100%;
-    max-width: 720px;
-}
-
-.gr-sheet-stats {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 18px;
-}
-
-.gr-sheet-stats td {
-    border: 1px solid #CCCCCC;
-    padding: 8px;
-    text-align: center;
-    font-size: 13px;
-    background: #F5F5F5;
-}
-
-.gr-sheet h3 {
-    font-size: 15px;
-    color: #0066CC;
-    margin: 0 0 8px;
-}
-
-.gr-sheet-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-}
-
-.gr-sheet-table th {
-    background: #0066CC;
-    color: #fff;
-    border: 1px solid #CCCCCC;
-    padding: 6px;
-    text-align: center;
-}
-
-.gr-sheet-table td {
-    border: 1px solid #CCCCCC;
-    padding: 5px 6px;
-    text-align: center;
-}
-
-.gr-sheet-table tr:nth-child(even) td {
-    background: #F9F9F9;
-}
-
-.gr-sheet-foot {
-    margin-top: 18px;
-    padding-top: 10px;
-    border-top: 1px solid #DDDDDD;
-    text-align: center;
-    color: #999999;
-    font-size: 11px;
-}
 
 /* --- Адаптив для смартфона ----------------------------------------------- */
 @media (max-width: 600px) {

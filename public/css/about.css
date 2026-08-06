@@ -111,3 +111,55 @@
     font-size: var(--font-size-small);
     text-align: center;
 }
+
+/* ============================================================================
+   ВЫБОР АКТИВНОГО ЧЛЕНА СЕМЬИ (ТЗ v3.1 часть 1, пункт 3.1)
+   ========================================================================== */
+.profile-active {
+    background: var(--color-primary-light);
+    border: 2px solid var(--color-primary);
+    border-radius: var(--radius);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.profile-active label {
+    display: block;
+    font-weight: 600;
+    font-size: var(--font-size-small);
+    margin-bottom: 6px;
+}
+
+.profile-active select {
+    width: 100%;
+    min-height: var(--touch-min);
+    padding: 0 var(--spacing-sm);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    color: var(--color-text);
+    background: var(--color-card);
+    border: 2px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+}
+
+.profile-active-hint {
+    margin-top: 6px;
+    font-size: 15px;
+    color: var(--color-text-secondary);
+}
+
+.profile-card-active {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+.profile-badge {
+    display: inline-block;
+    background: var(--color-secondary-light);
+    color: #1B5E20;
+    border-radius: 999px;
+    padding: 1px 10px;
+    font-size: 14px;
+    font-weight: 600;
+    vertical-align: middle;
+}

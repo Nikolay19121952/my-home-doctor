@@ -62,20 +62,21 @@ var Period = {
         var sheet = Period.buildSheet(list);
         document.body.appendChild(sheet);
 
-        // Даём браузеру кадр на отрисовку листа перед съёмкой
-        setTimeout(function () {
-            html2canvas(sheet, { scale: 2, backgroundColor: '#FFFFFF', logging: false })
-                .then(function (canvas) {
-                    document.body.removeChild(sheet);
-                    Period.toPDF(canvas, list);
-                })
-                .catch(function (err) {
-                    if (sheet.parentNode) document.body.removeChild(sheet);
-                    Period._busy = false;
-                    UI.showToast('Не удалось создать PDF: ' +
-                        (err && err.message ? err.message : 'ошибка'), 4500);
-                });
-        }, 250);
+        // Ждём отрисовки листа и снимаем его с явной шириной виртуального
+        // окна — иначе на смартфоне документ обрезается (см. Graphs.shotOptions)
+        Graphs.waitImages(sheet).then(function () {
+            return html2canvas(sheet, Graphs.shotOptions(sheet));
+        })
+            .then(function (canvas) {
+                document.body.removeChild(sheet);
+                Period.toPDF(canvas, list);
+            })
+            .catch(function (err) {
+                if (sheet.parentNode) document.body.removeChild(sheet);
+                Period._busy = false;
+                UI.showToast('Не удалось создать PDF: ' +
+                    (err && err.message ? err.message : 'ошибка'), 4500);
+            });
     },
 
     /* Раскладывает снятый лист по страницам A4 */
@@ -120,16 +121,56 @@ var Period = {
     /* ======================================================================
      * СБОРКА ЛИСТА
      * ==================================================================== */
+
+    /* Стили вкладываются в сам лист, а не берутся из внешнего файла:
+       html2canvas рисует копию страницы в отдельном окне и на смартфоне
+       не успевал подтянуть внешний CSS — документ выходил без оформления */
+    sheetCss: function () {
+        return '<style>' +
+            '.pd-sheet{position:fixed;left:-10000px;top:0;width:780px;background:#FFF;' +
+            'color:#222;font-family:Arial,Helvetica,sans-serif;font-size:13px;' +
+            'line-height:1.45;padding:28px;box-sizing:border-box}' +
+            '.pd-sheet *{box-sizing:border-box}' +
+            '.pd-head{text-align:center;border-bottom:2px solid #0066CC;' +
+            'padding-bottom:12px;margin-bottom:16px}' +
+            '.pd-head h1{margin:0;font-size:20px;color:#0066CC}' +
+            '.pd-head h2{margin:6px 0 8px;font-size:16px;color:#0D47A1}' +
+            '.pd-head p{margin:2px 0;font-size:13px}' +
+            '.pd-patient{background:#E6F2FF;border-radius:8px;padding:10px 14px;' +
+            'margin-bottom:16px;font-size:12px}' +
+            '.pd-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px}' +
+            '.pd-table th{background:#0066CC;color:#FFF;border:1px solid #CCC;' +
+            'padding:7px 5px;text-align:center;font-size:12px}' +
+            '.pd-table td{border:1px solid #CCC;padding:5px;text-align:center}' +
+            '.pd-table tr.pd-day td{background:#DCDCDC;font-weight:bold;text-align:left;' +
+            'font-size:13px;padding:7px 8px}' +
+            '.pd-day-count{font-weight:normal;color:#555;font-size:12px}' +
+            '.pd-h3{font-size:15px;color:#0066CC;margin:0 0 6px}' +
+            '.pd-total{margin:0 0 10px;font-size:13px}' +
+            '.pd-stats{width:100%;border-collapse:collapse;font-size:12px}' +
+            '.pd-stats th{background:#0066CC;color:#FFF;border:1px solid #CCC;' +
+            'padding:6px 5px;text-align:center}' +
+            '.pd-stats td{border:1px solid #CCC;padding:5px 6px;text-align:center}' +
+            '.pd-stats tr:nth-child(even) td{background:#F9F9F9}' +
+            '.pd-stats td.pd-left{text-align:left}' +
+            '.pd-over{color:#B71C1C;font-weight:bold}' +
+            '.pd-weight{margin-top:10px;font-size:13px}' +
+            '.pd-foot{margin-top:18px;padding-top:10px;border-top:1px solid #DDD;' +
+            'text-align:center;color:#999;font-size:11px}' +
+            '</style>';
+    },
     buildSheet: function (list) {
         var sheet = document.createElement('div');
         sheet.className = 'pd-sheet';
 
         var start = UI.formatDate(list[0].date);
+        var css = Period.sheetCss();
         var end = UI.formatDate(list[list.length - 1].date);
         var period = (start === end) ? start : (start + ' — ' + end);
         var profileCtx = Doctor.getProfileContext();
 
-        var html = '<div class="pd-head">' +
+        var html = css +
+            '<div class="pd-head">' +
             '<h1>🩺 Мой домашний доктор</h1>' +
             '<h2>Дневник здоровья</h2>' +
             '<p><strong>Период:</strong> ' + UI.escapeHtml(period) + '</p>' +

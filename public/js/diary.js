@@ -148,24 +148,31 @@ var Diary = {
         }
     },
 
-    getRecords: function () { return Diary._read(Diary.RECORDS_KEY, {}); },
-    saveRecords: function (r) { localStorage.setItem(Diary.RECORDS_KEY, JSON.stringify(r)); },
+    /* Ключи привязаны к активному профилю: у каждого члена семьи
+       свой дневник, свои консультации и свои настройки раздела */
+    recordsKey: function () { return Storage.pkey(Diary.RECORDS_KEY); },
+    currentKey: function () { return Storage.pkey(Diary.CURRENT_KEY); },
+    chatKey: function () { return Storage.pkey(Diary.CHAT_KEY); },
+    settingsKey: function () { return Storage.pkey(Diary.SETTINGS_KEY); },
 
-    getChat: function () { return Diary._read(Diary.CHAT_KEY, []); },
-    saveChat: function (c) { localStorage.setItem(Diary.CHAT_KEY, JSON.stringify(c)); },
+    getRecords: function () { return Diary._read(Diary.recordsKey(), {}); },
+    saveRecords: function (r) { localStorage.setItem(Diary.recordsKey(), JSON.stringify(r)); },
+
+    getChat: function () { return Diary._read(Diary.chatKey(), []); },
+    saveChat: function (c) { localStorage.setItem(Diary.chatKey(), JSON.stringify(c)); },
 
     getSettings: function () {
-        return Diary._read(Diary.SETTINGS_KEY, { theme: 'light', language: 'ru' });
+        return Diary._read(Diary.settingsKey(), { theme: 'light', language: 'ru' });
     },
-    saveSettings: function (s) { localStorage.setItem(Diary.SETTINGS_KEY, JSON.stringify(s)); },
+    saveSettings: function (s) { localStorage.setItem(Diary.settingsKey(), JSON.stringify(s)); },
 
-    getCurrent: function () { return Diary._read(Diary.CURRENT_KEY, null); },
+    getCurrent: function () { return Diary._read(Diary.currentKey(), null); },
     saveCurrent: function (c) {
         if (c === null) {
-            localStorage.removeItem(Diary.CURRENT_KEY);
+            localStorage.removeItem(Diary.currentKey());
         } else {
             c.last_saved = new Date().toISOString();
-            localStorage.setItem(Diary.CURRENT_KEY, JSON.stringify(c));
+            localStorage.setItem(Diary.currentKey(), JSON.stringify(c));
         }
     },
 
@@ -211,8 +218,11 @@ var Diary = {
 
         var html = '';
 
+        // Заголовок называет владельца дневника (ТЗ v3.1, пункт 3.2)
+        var owner = Storage.activeName();
         html += '<div class="dv-head">' +
-            '<h2 class="dv-title">📔 Мой дневник</h2>' +
+            '<h2 class="dv-title">📔 ' +
+            (owner ? 'Дневник — ' + UI.escapeHtml(owner) : 'Мой дневник') + '</h2>' +
             '<p class="dv-sub">Показано ' + days.length + ' из ' + allDays.length +
             (allDays.length === 1 ? ' записи' : ' записей') + '</p>' +
             '</div>';
@@ -262,8 +272,18 @@ var Diary = {
             Diary.panelBtn('4', '📝', 'Запись измерений', 'Diary.openForm()', 'dv-btn-main') +
             Diary.panelBtn('5', '💬', 'История чата', 'Diary.show(\'chat\')') +
             Diary.panelBtn('6', '📈', 'Создать график', 'Graphs.start()') +
-            Diary.panelBtn('7', '🖨️', 'Печать периода', 'Period.print()') +
+            Diary.panelBtn('7', '🖨️', 'Файл / Печать периода', 'Period.print()') +
             '</div>';
+
+        // Отметить все / снять отметки — чтобы не щёлкать каждый день вручную
+        if (days.length > 0) {
+            var allChecked = Diary.allSelected(days);
+            html += '<div class="dv-selectall">' +
+                '<button class="btn btn-outline btn-small" onclick="Diary.toggleAll()">' +
+                (allChecked ? '☑ Снять все отметки' : '☐ Отметить все') +
+                '</button>' +
+                '</div>';
+        }
 
         // Кнопка консультации — появляется, когда отмечены дни
         html += '<div class="dv-selbar" id="dv-selbar" style="display:none">' +
@@ -300,10 +320,11 @@ var Diary = {
                 if (Diary.dayLevel(records[pageDays[f]])) { hasFlags = true; break; }
             }
             if (hasFlags) {
-                html += '<p class="dv-legend">⚠️ Отмечены дни, где показатели выходили ' +
-                    'за обычные границы: <span class="dv-val dv-val-warn">жёлтым</span> — ' +
+                html += '<p class="dv-legend">⚠️ Под датой перечислены показатели, вышедшие ' +
+                    'за границы нормы: <span class="dv-val dv-val-warn">жёлтым</span> — ' +
                     'стоит обратить внимание, <span class="dv-val dv-val-danger">красным</span> — ' +
-                    'отклонение значительное. Это справочная подсказка, а не диагноз — ' +
+                    'отклонение значительное. Показатели в норме не перечисляются. ' +
+                    'Это справочная подсказка, а не диагноз — ' +
                     'оценить показатели может только врач.</p>';
             }
         }
@@ -332,13 +353,40 @@ var Diary = {
         var count = Diary.filledCount(rec.measurements);
         var checked = Diary._selectedDays.indexOf(rec.date) !== -1;
 
-        // Отметка дня: были ли за сутки значения вне обычных границ
-        var level = Diary.dayLevel(rec);
+        // Перечень отклонений за день (ТЗ v3.1, пункт 2.2)
+        var devs = Diary.deviations(rec);
+        var level = '';
+        for (var k = 0; k < devs.length; k++) {
+            if (devs[k].level === 'danger') { level = 'danger'; break; }
+            level = 'warn';
+        }
+
         var flag = '';
-        if (level === 'danger') {
-            flag = ' <span class="dv-flag dv-flag-danger" title="Есть значения, сильно выходящие за обычные границы">⚠️</span>';
-        } else if (level === 'warn') {
-            flag = ' <span class="dv-flag dv-flag-warn" title="Есть значения выше или ниже обычных границ">⚠️</span>';
+        if (level) {
+            flag = ' <span class="dv-flag dv-flag-' + level + '">⚠️ ' +
+                devs.length + Diary.plural(devs.length, ' отклонение', ' отклонения', ' отклонений') +
+                '</span>';
+        }
+
+        // Сами отклонения: время, показатель, значение. Длинный список
+        // подрезаем, чтобы карточка дня не разрасталась на весь экран
+        var devHtml = '';
+        if (devs.length) {
+            var shown = devs.slice(0, 6);
+            devHtml = '<div class="dv-devs">';
+            for (var n = 0; n < shown.length; n++) {
+                var dv = shown[n];
+                devHtml += '<div class="dv-dev dv-dev-' + dv.level + '">' +
+                    '<span class="dv-dev-time">' + UI.escapeHtml(dv.time) + '</span> ' +
+                    UI.escapeHtml(dv.label) + ': <strong>' + UI.escapeHtml(String(dv.value)) + '</strong>' +
+                    '</div>';
+            }
+            if (devs.length > shown.length) {
+                devHtml += '<div class="dv-dev-more">и ещё ' + (devs.length - shown.length) +
+                    Diary.plural(devs.length - shown.length, ' отклонение', ' отклонения', ' отклонений') +
+                    ' — откройте запись</div>';
+            }
+            devHtml += '</div>';
         }
 
         return '<div class="dv-item' + (level ? ' dv-item-' + level : '') + '">' +
@@ -350,6 +398,7 @@ var Diary = {
             '<div class="dv-item-date">' + UI.escapeHtml(Diary.formatDay(rec.date)) + flag +
             ' <span class="dv-badge">' + count + Diary.plural(count, ' измерение', ' измерения', ' измерений') + '</span></div>' +
             '<div class="dv-item-brief">' + brief + '</div>' +
+            devHtml +
             '</div>' +
             '<div class="dv-item-actions">' +
             '<button class="btn btn-outline btn-small" onclick="Diary.openRecord(\'' + rec.date + '\')">Откр.</button>' +
@@ -420,6 +469,39 @@ var Diary = {
             Diary._selectedDays = Diary._selectedDays.filter(function (d) { return d !== day; });
         }
         Diary.updateSelBar();
+    },
+
+    /* Отмечены ли все дни, попавшие в текущий фильтр */
+    allSelected: function (days) {
+        if (!days.length) return false;
+        for (var i = 0; i < days.length; i++) {
+            if (Diary._selectedDays.indexOf(days[i]) === -1) return false;
+        }
+        return true;
+    },
+
+    /* Кнопка «Отметить все»: работает по дням текущего фильтра, а не по видимой странице */
+    toggleAll: function () {
+        var records = Diary.getRecords();
+        var days = Diary.applyFilter(
+            Object.keys(records).sort(function (a, b) { return a < b ? 1 : -1; })
+        );
+        if (days.length === 0) return;
+
+        if (Diary.allSelected(days)) {
+            Diary._selectedDays = Diary._selectedDays.filter(function (d) {
+                return days.indexOf(d) === -1;
+            });
+            UI.showToast('Отметки сняты');
+        } else {
+            for (var i = 0; i < days.length; i++) {
+                if (Diary._selectedDays.indexOf(days[i]) === -1) {
+                    Diary._selectedDays.push(days[i]);
+                }
+            }
+            UI.showToast('Отмечено дней: ' + days.length);
+        }
+        Diary.renderList();
     },
 
     updateSelBar: function () {
@@ -1471,31 +1553,72 @@ var Diary = {
     },
 
     /* ======================================================================
-     * ПОДСВЕТКА ЗНАЧЕНИЙ ВНЕ ОБЫЧНЫХ ГРАНИЦ
+     * ОТКЛОНЕНИЯ ОТ НОРМ (ТЗ v3.1 часть 1, пункт 2.2)
      *
-     * Границы взяты как общепринятые справочные, а не как диагноз: у каждого
-     * пациента своя норма, и решает всегда врач. Отметка нужна лишь чтобы
-     * в длинном списке дней сразу было видно, куда стоит заглянуть.
+     * Границы заданы Доктором под конкретного пациента, а не как общая
+     * медицинская норма. Значения ниже 125 по верхнему давлению помечаются
+     * красным намеренно: при атеросклерозе брахиоцефальных артерий у пожилых
+     * чрезмерное снижение давления так же нежелательно, как повышение.
      *
-     * Возвращает '' (в границах), 'warn' (обратить внимание) или
-     * 'danger' (значительное отклонение).
+     * ВНИМАНИЕ. В ТЗ не заданы два диапазона: верхнее 140–159 и нижнее
+     * 90–109. Оставить их без отметки означало бы показывать 150/95
+     * как норму, поэтому они помечены красным. Требует подтверждения
+     * Доктора — правится ниже в одной функции.
+     *
+     * Возвращает '' (норма), 'warn' (жёлтое) или 'danger' (красное).
      * ==================================================================== */
-    LIMITS: {
-        // [нижняя граница danger, нижняя warn, верхняя warn, верхняя danger]
-        ad_top: [90, 100, 140, 180],
-        ad_bottom: [60, 65, 90, 110],
-        pulse: [40, 50, 90, 120],
-        spo2: [88, 92, 999, 999],
-        sugar: [3.0, 3.9, 6.1, 7.8],
-        temp: [35.0, 35.5, 37.1, 38.5]
+    NORMS: {
+        ad_top: function (v) {
+            if (v < 125) return 'danger';        // ТЗ: красное
+            if (v <= 139) return 'warn';         // ТЗ: жёлтое 125–139
+            return 'danger';                     // 140 и выше (в ТЗ было ≥160)
+        },
+        ad_bottom: function (v) {
+            if (v < 70) return 'danger';         // ТЗ: красное
+            if (v <= 89) return 'warn';          // ТЗ: жёлтое 70–89
+            return 'danger';                     // 90 и выше (в ТЗ было ≥110)
+        },
+        pulse: function (v) {
+            if (v < 50) return 'danger';
+            if (v <= 59) return 'warn';          // ТЗ: жёлтое 50–59
+            if (v <= 100) return '';             // норма 60–100
+            if (v <= 110) return 'warn';         // ТЗ: жёлтое 101–110
+            return 'danger';                     // ТЗ: красное больше 110
+        },
+        spo2: function (v) {
+            if (v < 92) return 'danger';         // ТЗ: красное
+            if (v <= 94) return 'warn';          // ТЗ: жёлтое 92–94
+            return '';
+        },
+        sugar: function (v) {
+            if (v < 4.5) return 'danger';        // ТЗ: красное
+            if (v <= 4.9) return 'warn';         // ТЗ: жёлтое 4.5–4.9
+            if (v <= 6.0) return '';             // норма 5.0–6.0
+            if (v <= 7.0) return 'warn';         // ТЗ: жёлтое 6.1–7.0
+            return 'danger';                     // ТЗ: красное больше 7.0
+        },
+        // Температуру ТЗ не описывает — оставлены прежние границы
+        temp: function (v) {
+            if (v < 35.0 || v >= 38.5) return 'danger';
+            if (v < 35.5 || v >= 37.1) return 'warn';
+            return '';
+        }
+    },
+
+    /* Понятные названия показателей для перечня отклонений */
+    LABELS: {
+        ad_top: 'АД верх',
+        ad_bottom: 'АД низ',
+        pulse: 'Пульс',
+        spo2: 'SpO2',
+        sugar: 'Сахар',
+        temp: 't°'
     },
 
     level: function (field, value) {
-        var lim = Diary.LIMITS[field];
-        if (!lim || value === null || value === undefined || value === '') return '';
-        if (value < lim[0] || value > lim[3]) return 'danger';
-        if (value < lim[1] || value > lim[2]) return 'warn';
-        return '';
+        var fn = Diary.NORMS[field];
+        if (!fn || value === null || value === undefined || value === '') return '';
+        return fn(Number(value));
     },
 
     /* Оборачивает текст значения в цветную метку, если оно вне границ.
@@ -1514,24 +1637,52 @@ var Diary = {
         return lvl ? '<span class="dv-val dv-val-' + lvl + '">' + safe + '</span>' : safe;
     },
 
-    /* Худший уровень за весь день — по всем измерениям сразу */
-    dayLevel: function (rec) {
-        if (!rec || !rec.measurements) return '';
-        var worst = '';
-        for (var i = 0; i < rec.measurements.length; i++) {
-            var m = rec.measurements[i];
-            var checks = [
-                Diary.level('ad_top', m.ad_top),
-                Diary.level('ad_bottom', m.ad_bottom),
-                Diary.level('pulse', m.pulse),
-                Diary.level('spo2', m.spo2),
-                Diary.level('sugar', m.sugar),
-                Diary.level('temp', m.temperature)
-            ];
-            for (var j = 0; j < checks.length; j++) {
-                if (checks[j] === 'danger') return 'danger';
-                if (checks[j] === 'warn') worst = 'warn';
+    /* ----------------------------------------------------------------------
+     * Полный перечень отклонений за день: время, показатель, значение, цвет.
+     * Значения в норме в перечень не попадают.
+     * -------------------------------------------------------------------- */
+    deviations: function (rec) {
+        var out = [];
+        if (!rec || !rec.measurements) return out;
+
+        var fields = [
+            { key: 'ad_top', from: 'ad_top' },
+            { key: 'ad_bottom', from: 'ad_bottom' },
+            { key: 'pulse', from: 'pulse' },
+            { key: 'spo2', from: 'spo2' },
+            { key: 'sugar', from: 'sugar' },
+            { key: 'temp', from: 'temperature' }
+        ];
+
+        var rows = Diary.validRows(rec.measurements);
+        rows.sort(function (a, b) { return a.time < b.time ? -1 : 1; });
+
+        for (var i = 0; i < rows.length; i++) {
+            var m = rows[i];
+            for (var j = 0; j < fields.length; j++) {
+                var f = fields[j];
+                var v = m[f.from];
+                var lvl = Diary.level(f.key, v);
+                if (lvl) {
+                    out.push({
+                        time: m.time,
+                        label: Diary.LABELS[f.key],
+                        value: v,
+                        level: lvl
+                    });
+                }
             }
+        }
+        return out;
+    },
+
+    /* Худший уровень за весь день */
+    dayLevel: function (rec) {
+        var devs = Diary.deviations(rec);
+        var worst = '';
+        for (var i = 0; i < devs.length; i++) {
+            if (devs[i].level === 'danger') return 'danger';
+            worst = 'warn';
         }
         return worst;
     },

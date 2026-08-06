@@ -59,10 +59,25 @@ var Doctor = {
         });
 
         Doctor.renderHistory();
+        Doctor.updateTitle();
+    },
+
+    /* История переписки своя у каждого члена семьи */
+    historyKey: function () { return Storage.pkey(Doctor.HISTORY_KEY); },
+
+    /* Заголовок называет, с кем именно ведётся чат (ТЗ v3.1, пункт 3.3) */
+    updateTitle: function () {
+        var el = document.getElementById('chat-title');
+        if (!el) return;
+        var name = Storage.activeName();
+        // В ТЗ было «Чат Доктора с [ФИО]», но по-русски это требует
+        // склонения имени («с Ларионовым Николаем Дмитриевичем»),
+        // а склонять ФИО программно ненадёжно. Ставим тире.
+        el.textContent = name ? 'Чат Доктора — ' + name : 'Доктор';
     },
 
     getHistory: function () {
-        var data = localStorage.getItem(Doctor.HISTORY_KEY);
+        var data = localStorage.getItem(Doctor.historyKey());
         if (!data) return [];
         try {
             return JSON.parse(data);
@@ -72,11 +87,11 @@ var Doctor = {
     },
 
     saveHistory: function (history) {
-        localStorage.setItem(Doctor.HISTORY_KEY, JSON.stringify(history));
+        localStorage.setItem(Doctor.historyKey(), JSON.stringify(history));
     },
 
     clearHistory: function () {
-        localStorage.removeItem(Doctor.HISTORY_KEY);
+        localStorage.removeItem(Doctor.historyKey());
         Doctor.renderHistory();
     },
 
@@ -204,11 +219,19 @@ var Doctor = {
         }
     },
 
+    /* ----------------------------------------------------------------------
+     * Сведения о пациенте для доктора.
+     *
+     * С версии 3.1 передаются данные только активного профиля: чат ведётся
+     * с конкретным членом семьи, и отправлять доктору карты всех остальных
+     * ни к чему — это и лишний контекст, и чужие персональные данные.
+     * -------------------------------------------------------------------- */
     getProfileContext: function () {
-        var profiles = Storage.getProfiles();
+        var active = Storage.getActiveProfile();
+        var profiles = active ? [active] : Storage.getProfiles();
         if (profiles.length === 0) return '';
 
-        var lines = ['Профили пациентов в семье:'];
+        var lines = [active ? 'Сведения о пациенте:' : 'Профили пациентов в семье:'];
         for (var i = 0; i < profiles.length; i++) {
             var p = profiles[i];
             var parts = ['— ' + p.name];
@@ -418,7 +441,7 @@ var Doctor = {
         xhr.send(body);
     },
 
-    addBubble: function (role, text, showButtons, fullText) {
+    addBubble: function (role, text, showButtons, fullText, historyIndex) {
         var container = document.getElementById('chat-messages');
         var bubble = document.createElement('div');
         bubble.className = role === 'user' ? 'chat-bubble chat-bubble-user' : 'chat-bubble chat-bubble-bot';
@@ -432,14 +455,32 @@ var Doctor = {
             var textForBtns = fullText || text;
             var btnWrap = document.createElement('div');
             btnWrap.className = 'chat-bubble-actions';
-            // v2.2: одна кнопка вместо двух — обе открывали один и тот же
-            // диалог браузера, где выбирается принтер или «Сохранить как PDF»
+            // v3.1: под каждым ответом три кнопки — копировать, печать
+            // с сохранением в файл и удаление консультации
+            var copyBtn = document.createElement('button');
+            copyBtn.className = 'btn btn-outline btn-print';
+            copyBtn.innerHTML = '📋 Копировать';
+            copyBtn.title = 'Скопировать текст ответа';
+            copyBtn.onclick = function () { Doctor.copyReply(textForBtns); };
+            btnWrap.appendChild(copyBtn);
+
             var printBtn = document.createElement('button');
             printBtn.className = 'btn btn-outline btn-print';
             printBtn.innerHTML = '🖨️ Печать / 💾 Файл';
             printBtn.title = 'Печать или сохранение в PDF';
             printBtn.onclick = function () { Doctor.saveReportToFile(textForBtns); };
             btnWrap.appendChild(printBtn);
+
+            // Удалять можно только сохранённые в истории ответы
+            if (typeof historyIndex === 'number') {
+                var delBtn = document.createElement('button');
+                delBtn.className = 'btn btn-outline btn-print btn-del-reply';
+                delBtn.innerHTML = '✕ Удалить';
+                delBtn.title = 'Удалить эту консультацию из истории';
+                delBtn.onclick = function () { Doctor.deleteReply(historyIndex); };
+                btnWrap.appendChild(delBtn);
+            }
+
             bubble.appendChild(btnWrap);
         }
 
@@ -561,8 +602,63 @@ var Doctor = {
         }
 
         for (var i = 0; i < history.length; i++) {
-            Doctor.addBubble(history[i].role, history[i].content);
+            Doctor.addBubble(history[i].role, history[i].content, undefined, undefined, i);
         }
+    },
+
+    /* ----------------------------------------------------------------------
+     * КНОПКИ ПОД ОТВЕТОМ ДОКТОРА (ТЗ v3.1 часть 1, пункт 1)
+     * -------------------------------------------------------------------- */
+
+    /* Копировать текст ответа в буфер обмена */
+    copyReply: function (text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                UI.showToast('Скопировано в буфер обмена');
+            }).catch(function () {
+                Doctor.fallbackCopy(text);
+            });
+        } else {
+            Doctor.fallbackCopy(text);
+        }
+    },
+
+    fallbackCopy: function (text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand('copy');
+            UI.showToast('Скопировано в буфер обмена');
+        } catch (e) {
+            UI.showToast('Не удалось скопировать');
+        }
+        document.body.removeChild(ta);
+    },
+
+    /* Удалить консультацию: ответ доктора и вызвавший его вопрос */
+    deleteReply: function (index) {
+        UI.showConfirm(
+            'Удалить консультацию?',
+            'Ответ доктора и ваш вопрос к нему будут удалены из истории.',
+            'Удалить',
+            function () {
+                var history = Doctor.getHistory();
+                if (index < 0 || index >= history.length) return;
+
+                var from = index;
+                // Захватываем вопрос пользователя, который был перед ответом
+                if (index > 0 && history[index - 1].role === 'user') from = index - 1;
+                history.splice(from, index - from + 1);
+
+                Doctor.saveHistory(history);
+                Doctor.renderHistory();
+                UI.showToast('Консультация удалена');
+            }
+        );
     },
 
     showAccessCodePrompt: function (pendingText, pendingFiles) {

@@ -530,17 +530,31 @@ var More = {
      * незавершённый черновик), обе истории чата, анализы и напоминания.
      * ---------------------------------------------------------------- */
     exportData: function () {
+        var profiles = Storage.getProfiles();
+
+        // С версии 3.1 у каждого члена семьи свой дневник и своя переписка —
+        // в копию попадают данные всех профилей, а не только активного
+        var byProfile = {};
+        for (var i = 0; i < profiles.length; i++) {
+            byProfile[profiles[i].id] = Storage.collectProfileData(profiles[i].id);
+        }
+        byProfile['default'] = Storage.collectProfileData('default');
+
         var data = {
-            version: '2.3',
+            version: '3.1',
             exportDate: new Date().toISOString(),
             device: navigator.userAgent,
-            profiles: Storage.getProfiles(),
+            profiles: profiles,
+            activeProfile: Storage.getActiveId(),
+            profileData: byProfile,
+            reminders: More.getReminders(),
+            analyses: More.getAnalyses(),
+            // Данные активного профиля дублируются в прежнем виде,
+            // чтобы копию можно было открыть и старой версией приложения
             diaryRecords: Diary.getRecords(),
             diaryCurrent: Diary.getCurrent(),
             diaryChat: Diary.getChat(),
             diarySettings: Diary.getSettings(),
-            reminders: More.getReminders(),
-            analyses: More.getAnalyses(),
             chatHistory: Doctor.getHistory()
         };
 
@@ -627,7 +641,10 @@ var More = {
             reminders: data.reminders || null,
             analyses: data.analyses || null,
             chatHistory: data.chatHistory || data.doctor_chat || null,
-            legacyDiary: null
+            legacyDiary: null,
+            // Данные по каждому члену семьи (появились в версии 3.1)
+            profileData: data.profileData || null,
+            activeProfile: data.activeProfile || null
         };
 
         // В самом первом формате дневник был плоским массивом измерений
@@ -637,7 +654,8 @@ var More = {
         }
 
         var hasSomething = out.profiles || out.diaryRecords || out.legacyDiary ||
-            out.diaryChat || out.chatHistory || out.reminders || out.analyses;
+            out.diaryChat || out.chatHistory || out.reminders || out.analyses ||
+            out.profileData;
         return hasSomething ? out : null;
     },
 
@@ -674,14 +692,34 @@ var More = {
                 parts.push(data.profiles.length +
                     Diary.plural(data.profiles.length, ' профиль', ' профиля', ' профилей'));
             }
-            var days = data.diaryRecords ? Object.keys(data.diaryRecords).length
-                : (data.legacyDiary ? data.legacyDiary.length : 0);
+            // Считаем записи по всем членам семьи, а не только по активному
+            var days = 0;
+            var consults = 0;
+            if (data.profileData) {
+                for (var pid in data.profileData) {
+                    if (!data.profileData.hasOwnProperty(pid)) continue;
+                    var bucket = data.profileData[pid];
+                    try {
+                        if (bucket.mdd_diary_records) {
+                            days += Object.keys(JSON.parse(bucket.mdd_diary_records)).length;
+                        }
+                        if (bucket.mdd_diary_chat) {
+                            consults += JSON.parse(bucket.mdd_diary_chat).length;
+                        }
+                    } catch (e) { /* повреждённый кусок пропускаем */ }
+                }
+            } else {
+                days = data.diaryRecords ? Object.keys(data.diaryRecords).length
+                    : (data.legacyDiary ? data.legacyDiary.length : 0);
+                consults = (data.diaryChat && data.diaryChat.length) || 0;
+            }
+
             if (days) {
                 parts.push(days + Diary.plural(days, ' запись', ' записи', ' записей') + ' дневника');
             }
-            if (data.diaryChat && data.diaryChat.length) {
-                parts.push(data.diaryChat.length +
-                    Diary.plural(data.diaryChat.length, ' консультация', ' консультации', ' консультаций'));
+            if (consults) {
+                parts.push(consults +
+                    Diary.plural(consults, ' консультация', ' консультации', ' консультаций'));
             }
             if (data.analyses && data.analyses.length) {
                 parts.push(data.analyses.length +
@@ -699,20 +737,32 @@ var More = {
                 'Восстановить',
                 function () {
                     if (data.profiles) Storage.saveProfiles(data.profiles);
-                    if (data.diaryRecords) Diary.saveRecords(data.diaryRecords);
-                    if (data.diaryChat) Diary.saveChat(data.diaryChat);
-                    if (data.diarySettings) Diary.saveSettings(data.diarySettings);
-                    Diary.saveCurrent(data.diaryCurrent || null);
+                    if (data.activeProfile) Storage.setActiveId(data.activeProfile);
 
-                    // Плоский дневник первой версии переносим в формат по дням
-                    if (data.legacyDiary) {
-                        localStorage.setItem(Diary.LEGACY_KEY, JSON.stringify(data.legacyDiary));
-                        Diary.migrateLegacy();
+                    if (data.profileData) {
+                        // Копия версии 3.1: у каждого члена семьи свои данные
+                        for (var pid in data.profileData) {
+                            if (data.profileData.hasOwnProperty(pid)) {
+                                Storage.restoreProfileData(pid, data.profileData[pid]);
+                            }
+                        }
+                    } else {
+                        // Копия прежних версий: всё принадлежит активному профилю
+                        if (data.diaryRecords) Diary.saveRecords(data.diaryRecords);
+                        if (data.diaryChat) Diary.saveChat(data.diaryChat);
+                        if (data.diarySettings) Diary.saveSettings(data.diarySettings);
+                        Diary.saveCurrent(data.diaryCurrent || null);
+                        if (data.chatHistory) Doctor.saveHistory(data.chatHistory);
+
+                        // Плоский дневник первой версии переносим в формат по дням
+                        if (data.legacyDiary) {
+                            localStorage.setItem(Diary.LEGACY_KEY, JSON.stringify(data.legacyDiary));
+                            Diary.migrateLegacy();
+                        }
                     }
 
                     if (data.reminders) More.saveReminders(data.reminders);
                     if (data.analyses) More.saveAnalyses(data.analyses);
-                    if (data.chatHistory) Doctor.saveHistory(data.chatHistory);
 
                     UI.showToast('Данные восстановлены! Перезагружаю...', 2000);
                     setTimeout(function () { location.reload(); }, 1200);
@@ -735,16 +785,16 @@ var More = {
             'Профили, дневник, напоминания, анализы и история чата будут удалены безвозвратно.',
             'Удалить всё',
             function () {
-                localStorage.removeItem('mdd_profiles');
-                localStorage.removeItem('mdd_diary');
-                localStorage.removeItem('mdd_diary_records');
-                localStorage.removeItem('mdd_diary_current');
-                localStorage.removeItem('mdd_diary_chat');
-                localStorage.removeItem('mdd_diary_settings');
-                localStorage.removeItem('mdd_diary_v1_backup');
-                localStorage.removeItem('mdd_reminders');
-                localStorage.removeItem('mdd_analyses');
-                localStorage.removeItem('mdd_chat_history');
+                // Данные разделены по членам семьи, поэтому убираем
+                // все ключи приложения, включая ключи с суффиксом профиля
+                var keys = [];
+                for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    if (k && k.indexOf('mdd_') === 0) keys.push(k);
+                }
+                for (var j = 0; j < keys.length; j++) {
+                    localStorage.removeItem(keys[j]);
+                }
                 UI.showToast('Все данные удалены');
                 More.renderSettings(document.querySelector('#more .container'));
             }
@@ -778,6 +828,8 @@ var More = {
             '<li><strong>Измерений в одном дне:</strong> до 36</li>' +
             '<li><strong>Графики:</strong> по любому из показателей за выбранные дни</li>' +
             '<li><strong>Документы для врача:</strong> дневник за период одним файлом PDF</li>' +
+            '<li><strong>Несколько членов семьи:</strong> у каждого свои дневник, ' +
+            'консультации и графики</li>' +
             '<li><strong>Поддерживаемые браузеры:</strong> Chrome, Яндекс, Firefox, ' +
             'Edge, Safari, Opera, Maxthon</li>' +
             '</ul></div>';
@@ -798,7 +850,10 @@ var More = {
             'остаётся ввести показатели. После сохранения приложение возвращается сюда же, ' +
             'чтобы можно было сразу записать следующее измерение.</div></div>' +
             '<div class="about-step"><span class="about-step-icon">👨‍👩‍👧‍👦</span>' +
-            '<div><strong>Семья</strong> — создайте профили членов семьи с указанием возраста, роста, ' +
+            '<div><strong>Семья</strong> — если карточек несколько, вверху появляется выбор ' +
+            'активного профиля: приложение показывает дневник, консультации и графики ' +
+            'выбранного человека, у каждого они свои. ' +
+            'Создайте профили членов семьи с указанием возраста, роста, ' +
             'хронических заболеваний, аллергий, принимаемых лекарств, операций и вредных привычек. ' +
             'Доктор учтёт эту информацию при консультации. Заполняйте только те графы, которые считаете важными.</div></div>' +
             '<div class="about-step"><span class="about-step-icon">📔</span>' +
