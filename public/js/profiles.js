@@ -185,15 +185,79 @@ var Profiles = {
         App.navigateTo('profile-view');
     },
 
+    /* ----------------------------------------------------------------------
+     * ДИАГНОЗЫ СПИСКОМ (ТЗ v3.1 часть 2, раздел 7)
+     * По ним подбирается норма показателей, поэтому свободный текст заменён
+     * на выбор из справочника. Текстовое поле осталось для уточнений.
+     * -------------------------------------------------------------------- */
+    renderDiagnoses: function (selected) {
+        var host = document.getElementById('profile-diagnoses');
+        if (!host) return;
+
+        var list = Norms.DIAGNOSIS_LIST();
+        var html = '';
+        for (var i = 0; i < list.length; i++) {
+            var d = list[i];
+            var checked = selected.indexOf(d.id) !== -1 ? ' checked' : '';
+            html += '<label class="diag-item">' +
+                '<input type="checkbox" value="' + d.id + '"' + checked +
+                ' onchange="Profiles.onDiagnosisChange(this)">' +
+                '<span>' + UI.escapeHtml(d.title) + '</span></label>';
+        }
+        host.innerHTML = html;
+    },
+
+    /* «Хронических заболеваний нет» несовместимо с остальными отметками */
+    onDiagnosisChange: function (input) {
+        var host = document.getElementById('profile-diagnoses');
+        var boxes = host.querySelectorAll('input[type="checkbox"]');
+
+        if (input.value === 'none' && input.checked) {
+            for (var i = 0; i < boxes.length; i++) {
+                if (boxes[i].value !== 'none') boxes[i].checked = false;
+            }
+        } else if (input.checked) {
+            for (var j = 0; j < boxes.length; j++) {
+                if (boxes[j].value === 'none') boxes[j].checked = false;
+            }
+        }
+    },
+
+    selectedDiagnoses: function () {
+        var host = document.getElementById('profile-diagnoses');
+        if (!host) return [];
+        var boxes = host.querySelectorAll('input[type="checkbox"]:checked');
+        var out = [];
+        for (var i = 0; i < boxes.length; i++) {
+            if (boxes[i].value !== 'none') out.push(boxes[i].value);
+        }
+        return out;
+    },
+
+    /* Отмечен ли хоть один пункт, включая «заболеваний нет» */
+    diagnosesAnswered: function () {
+        var host = document.getElementById('profile-diagnoses');
+        return !!(host && host.querySelector('input[type="checkbox"]:checked'));
+    },
+
     openForm: function (id) {
         Profiles.editingId = id;
         var form = document.getElementById('form-profile');
         form.reset();
         Profiles.setGender(null);
+        Profiles.renderDiagnoses([]);
 
         if (id) {
             var profile = Storage.getProfileById(id);
             if (!profile) return;
+
+            // У карточек, созданных до появления справочника, диагнозы
+            // записаны текстом — пытаемся распознать их и отметить
+            var diagnoses = profile.diagnoses;
+            if (!diagnoses) {
+                diagnoses = Norms.guessFromText(profile.chronicConditions);
+            }
+            Profiles.renderDiagnoses(diagnoses);
             document.getElementById('profile-form-title').textContent = 'Редактирование';
             document.getElementById('profile-name').value = profile.name || '';
             document.getElementById('profile-birthdate').value = profile.birthDate || '';
@@ -227,14 +291,36 @@ var Profiles = {
     },
 
     saveForm: function () {
-        var name = document.getElementById('profile-name').value.trim();
-        if (!name) {
-            document.getElementById('profile-name').focus();
+        // Проверка обязательных полей (ТЗ v3.1 часть 2, раздел 7).
+        // Без даты рождения, роста и диагнозов невозможно подобрать нормы
+        // и посчитать индекс массы тела.
+        var nameEl = document.getElementById('profile-name');
+        var birthEl = document.getElementById('profile-birthdate');
+        var heightEl = document.getElementById('profile-height');
+
+        var missing = [];
+        if (!nameEl.value.trim()) missing.push({ el: nameEl, what: 'ФИО' });
+        if (!birthEl.value) missing.push({ el: birthEl, what: 'дату рождения' });
+        if (!heightEl.value) missing.push({ el: heightEl, what: 'рост' });
+        if (!Profiles.diagnosesAnswered()) {
+            missing.push({ el: document.getElementById('profile-diagnoses'), what: 'диагнозы' });
+        }
+
+        if (missing.length > 0) {
+            var parts = [];
+            for (var i = 0; i < missing.length; i++) parts.push(missing[i].what);
+            UI.showToast('Заполните полностью: ' + parts.join(', '), 4500);
+            if (missing[0].el && missing[0].el.focus) missing[0].el.focus();
+            if (missing[0].el && missing[0].el.scrollIntoView) {
+                missing[0].el.scrollIntoView({ block: 'center' });
+            }
             return;
         }
 
+        var name = nameEl.value.trim();
         var data = {
             name: name,
+            diagnoses: Profiles.selectedDiagnoses(),
             birthDate: document.getElementById('profile-birthdate').value || '',
             gender: Profiles._selectedGender || '',
             bloodType: document.getElementById('profile-blood').value || '',

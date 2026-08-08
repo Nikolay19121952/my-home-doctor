@@ -197,7 +197,7 @@ var Period = {
     tableHtml: function (list) {
         var html = '<table class="pd-table"><thead><tr>' +
             '<th>Время</th><th>АД</th><th>Пульс</th><th>SpO2</th>' +
-            '<th>Сахар</th><th>t°</th><th>Вес</th>' +
+            '<th>Сахар</th><th>t°</th><th>Вес / ИМТ</th>' +
             '</tr></thead><tbody>';
 
         for (var i = 0; i < list.length; i++) {
@@ -221,7 +221,7 @@ var Period = {
                     '<td>' + Period.cell(m.spo2) + '</td>' +
                     '<td>' + Period.cell(m.sugar) + '</td>' +
                     '<td>' + Period.cell(m.temperature) + '</td>' +
-                    '<td>' + Period.cell(m.weight) + '</td>' +
+                    '<td>' + Period.weightCell(m.weight) + '</td>' +
                     '</tr>';
             }
         }
@@ -231,6 +231,13 @@ var Period = {
 
     cell: function (v) {
         return (v === null || v === undefined || v === '') ? '—' : String(v);
+    },
+
+    /* Вес вместе с индексом массы тела */
+    weightCell: function (weight) {
+        if (weight === null || weight === undefined || weight === '') return '—';
+        var bmi = Norms.bmiFor(weight);
+        return bmi !== null ? (weight + ' / ' + bmi) : String(weight);
     },
 
     /* ======================================================================

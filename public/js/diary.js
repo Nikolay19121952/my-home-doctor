@@ -282,6 +282,8 @@ var Diary = {
                 '<button class="btn btn-outline btn-small" onclick="Diary.toggleAll()">' +
                 (allChecked ? '☑ Снять все отметки' : '☐ Отметить все') +
                 '</button>' +
+                '<button class="btn btn-outline btn-small dv-btn-danger" onclick="Diary.deleteSelected()">' +
+                '🗑 Удалить отмеченные</button>' +
                 '</div>';
         }
 
@@ -320,12 +322,22 @@ var Diary = {
                 if (Diary.dayLevel(records[pageDays[f]])) { hasFlags = true; break; }
             }
             if (hasFlags) {
-                html += '<p class="dv-legend">⚠️ Под датой перечислены показатели, вышедшие ' +
-                    'за границы нормы: <span class="dv-val dv-val-warn">жёлтым</span> — ' +
-                    'стоит обратить внимание, <span class="dv-val dv-val-danger">красным</span> — ' +
-                    'отклонение значительное. Показатели в норме не перечисляются. ' +
-                    'Это справочная подсказка, а не диагноз — ' +
+                var art = Diary.article();
+                html += '<p class="dv-legend">Под датой перечислены показатели, вышедшие ' +
+                    'за границы нормы: <span class="dv-val dv-val-warn">🟡 жёлтым</span> — ' +
+                    'отклонение от 5 до 15%, <span class="dv-val dv-val-danger">🔴 красным</span> — ' +
+                    'больше 15%. Показатели в норме не перечисляются.' +
+                    (art ? '<br>Нормы подобраны по карточке профиля: <strong>' +
+                        UI.escapeHtml(art.title) + '</strong>.' : '') +
+                    '<br>Это справочная подсказка, а не диагноз — ' +
                     'оценить показатели может только врач.</p>';
+            }
+
+            // Без даты рождения и роста нормы подобрать не из чего
+            if (!Diary.article()) {
+                html += '<p class="dv-legend">ℹ️ Чтобы приложение показывало отклонения ' +
+                    'от нормы, заполните в карточке профиля дату рождения, рост и диагнозы: ' +
+                    'нормы подбираются по возрасту и заболеваниям.</p>';
             }
         }
 
@@ -353,32 +365,35 @@ var Diary = {
         var count = Diary.filledCount(rec.measurements);
         var checked = Diary._selectedDays.indexOf(rec.date) !== -1;
 
-        // Перечень отклонений за день (ТЗ v3.1, пункт 2.2)
+        // Перечень отклонений от индивидуальных норм (ТЗ v3.1 часть 2, раздел 5)
         var devs = Diary.deviations(rec);
-        var level = '';
+        var counts = { danger: 0, warn: 0 };
         for (var k = 0; k < devs.length; k++) {
-            if (devs[k].level === 'danger') { level = 'danger'; break; }
-            level = 'warn';
+            if (devs[k].level === 'danger') counts.danger++; else counts.warn++;
         }
+        var level = counts.danger ? 'danger' : (counts.warn ? 'warn' : '');
 
+        // Счётчики у даты: сколько красных и сколько жёлтых
         var flag = '';
         if (level) {
-            flag = ' <span class="dv-flag dv-flag-' + level + '">⚠️ ' +
-                devs.length + Diary.plural(devs.length, ' отклонение', ' отклонения', ' отклонений') +
-                '</span>';
+            flag = ' <span class="dv-flag dv-flag-danger">🔴 ' + counts.danger + '</span>' +
+                ' <span class="dv-flag dv-flag-warn">🟡 ' + counts.warn + '</span>';
         }
 
-        // Сами отклонения: время, показатель, значение. Длинный список
-        // подрезаем, чтобы карточка дня не разрасталась на весь экран
+        // Строки отклонений. Длинный список подрезаем, чтобы карточка дня
+        // не разрасталась на весь экран
         var devHtml = '';
         if (devs.length) {
             var shown = devs.slice(0, 6);
             devHtml = '<div class="dv-devs">';
             for (var n = 0; n < shown.length; n++) {
                 var dv = shown[n];
+                var sign = dv.percent > 0 ? '+' : '';
                 devHtml += '<div class="dv-dev dv-dev-' + dv.level + '">' +
                     '<span class="dv-dev-time">' + UI.escapeHtml(dv.time) + '</span> ' +
                     UI.escapeHtml(dv.label) + ': <strong>' + UI.escapeHtml(String(dv.value)) + '</strong>' +
+                    ' <span class="dv-dev-norm">(норма ' + dv.range[0] + '–' + dv.range[1] + ')</span>' +
+                    ' <span class="dv-dev-pct">' + sign + dv.percent + '%</span>' +
                     '</div>';
             }
             if (devs.length > shown.length) {
@@ -502,6 +517,40 @@ var Diary = {
             UI.showToast('Отмечено дней: ' + days.length);
         }
         Diary.renderList();
+    },
+
+    /* ----------------------------------------------------------------------
+     * Удаление отмеченных записей (ТЗ v3.1 часть 2, раздел 6.1).
+     * Действие необратимое, поэтому спрашиваем подтверждение и называем,
+     * сколько именно записей будет удалено.
+     * -------------------------------------------------------------------- */
+    deleteSelected: function () {
+        var days = Diary._selectedDays.slice().sort();
+        if (days.length === 0) {
+            UI.showToast('Отметьте галочками записи, которые нужно удалить');
+            return;
+        }
+
+        var label = days.length === 1
+            ? 'Запись за ' + Diary.formatDay(days[0]) + ' будет удалена.'
+            : 'Будет удалено записей: ' + days.length + ' — с ' +
+              Diary.formatDay(days[0]) + ' по ' + Diary.formatDay(days[days.length - 1]) + '.';
+
+        UI.showConfirm(
+            'Удалить отмеченные записи?',
+            label + ' Это действие нельзя отменить.',
+            'Удалить',
+            function () {
+                var records = Diary.getRecords();
+                for (var i = 0; i < days.length; i++) {
+                    delete records[days[i]];
+                }
+                Diary.saveRecords(records);
+                Diary._selectedDays = [];
+                UI.showToast('Удалено записей: ' + days.length);
+                Diary.renderList();
+            }
+        );
     },
 
     updateSelBar: function () {
@@ -733,7 +782,7 @@ var Diary = {
             '<th>SpO2</th>' +
             '<th>Сахар</th>' +
             '<th>t°</th>' +
-            '<th>Вес</th>' +
+            '<th>Вес / ИМТ</th>' +
             '</tr></thead><tbody>';
 
         for (var i = from; i < to; i++) {
@@ -747,7 +796,7 @@ var Diary = {
                 Diary.cell(i, 'spo2', m.spo2, 'number') +
                 Diary.cell(i, 'sugar', m.sugar, 'decimal') +
                 Diary.cell(i, 'temperature', m.temperature, 'decimal') +
-                Diary.cell(i, 'weight', m.weight, 'decimal') +
+                Diary.weightCell(i, m.weight) +
                 '</tr>';
         }
 
@@ -756,6 +805,31 @@ var Diary = {
             ' из ' + Diary.MAX_ROWS + '. Листайте кнопками ⬆️ ⬇️.</p>';
         html += '<div class="dv-err" id="dv-cell-err"></div>';
         return html;
+    },
+
+    /* ----------------------------------------------------------------------
+     * Ячейка веса с индексом массы тела (ТЗ v3.1 часть 2, раздел 3).
+     * ИМТ не вводится и не хранится — считается из веса и роста профиля,
+     * поэтому всегда соответствует текущим данным карточки.
+     * -------------------------------------------------------------------- */
+    weightCell: function (row, weight) {
+        var bmi = Norms.bmiFor(weight);
+        var hint = bmi !== null
+            ? '<span class="dv-bmi" id="dv-bmi-' + row + '">ИМТ ' + bmi + '</span>'
+            : '<span class="dv-bmi" id="dv-bmi-' + row + '"></span>';
+
+        return '<td class="dv-c-weight"><input type="text" class="dv-cell" data-row="' + row +
+            '" data-field="weight" value="' + UI.escapeHtml(weight === null || weight === undefined ? '' : String(weight)) +
+            '" inputmode="decimal" maxlength="5">' + hint + '</td>';
+    },
+
+    /* Пересчитать подпись ИМТ после ввода веса */
+    refreshBmi: function (row) {
+        var el = document.getElementById('dv-bmi-' + row);
+        if (!el || !Diary._current) return;
+        var m = Diary._current.measurements[row];
+        var bmi = m ? Norms.bmiFor(m.weight) : null;
+        el.textContent = bmi !== null ? 'ИМТ ' + bmi : '';
     },
 
     cell: function (row, field, value, kind) {
@@ -850,7 +924,7 @@ var Diary = {
                     return;
                 }
                 m.time = '';
-                Diary.afterChange();
+                Diary.afterChange(row);
                 return;
             }
             var norm = Diary.normalizeTime(raw);
@@ -870,14 +944,14 @@ var Diary = {
             }
             m.time = norm;
             input.value = norm;
-            Diary.afterChange();
+            Diary.afterChange(row);
             return;
         }
 
         /* --- Числовые поля ---------------------------------------------- */
         if (raw === '') {
             m[field] = null;
-            Diary.afterChange();
+            Diary.afterChange(row);
             return;
         }
 
@@ -933,13 +1007,14 @@ var Diary = {
             UI.showToast('Лимит 36 измерений достигнут. Завершите запись!', 3500);
         }
 
-        Diary.afterChange();
+        Diary.afterChange(row);
     },
 
-    afterChange: function () {
+    afterChange: function (row) {
         Diary._dirty = true;
         Diary.autosave();
         Diary.refreshCounter();
+        if (typeof row === 'number') Diary.refreshBmi(row);
     },
 
     refreshCounter: function () {
@@ -1316,7 +1391,10 @@ var Diary = {
                 if (m.spo2) parts.push('SpO2 ' + m.spo2 + '%');
                 if (m.sugar) parts.push('Сахар ' + m.sugar);
                 if (m.temperature) parts.push('t° ' + m.temperature);
-                if (m.weight) parts.push('Вес ' + m.weight + ' кг');
+                if (m.weight) {
+                    var bmi = Norms.bmiFor(m.weight);
+                    parts.push('Вес ' + m.weight + ' кг' + (bmi !== null ? ' (ИМТ ' + bmi + ')' : ''));
+                }
                 lines.push(m.time + ' — ' + parts.join(', '));
             }
             lines.push('');
@@ -1471,7 +1549,8 @@ var Diary = {
         var body = '<h2>Дневник здоровья за ' + UI.escapeHtml(Diary.formatDay(day)) + '</h2>';
         body += '<table class="grid"><tr>' +
             '<th>№</th><th>Время</th><th>АД верх</th><th>АД низ</th>' +
-            '<th>Пульс</th><th>SpO2, %</th><th>Сахар</th><th>t°</th><th>Вес</th></tr>';
+            '<th>Пульс</th><th>SpO2, %</th><th>Сахар</th><th>t°</th>' +
+            '<th>Вес</th><th>ИМТ</th></tr>';
         for (var i = 0; i < rows.length; i++) {
             var m = rows[i];
             body += '<tr>' +
@@ -1483,6 +1562,8 @@ var Diary = {
                 '<td>' + Diary.cellText(m.spo2) + '</td>' +
                 '<td>' + Diary.cellText(m.sugar) + '</td>' +
                 '<td>' + Diary.cellText(m.temperature) + '</td>' +
+                '<td>' + Diary.cellText(m.weight) + '</td>' +
+                '<td>' + Diary.cellText(Norms.bmiFor(m.weight)) + '</td>' +
                 '<td>' + Diary.cellText(m.weight) + '</td>' +
                 '</tr>';
         }
@@ -1553,75 +1634,36 @@ var Diary = {
     },
 
     /* ======================================================================
-     * ОТКЛОНЕНИЯ ОТ НОРМ (ТЗ v3.1 часть 1, пункт 2.2)
+     * ОТКЛОНЕНИЯ ОТ ИНДИВИДУАЛЬНЫХ НОРМ (ТЗ v3.1 часть 2, разделы 2, 4, 5)
      *
-     * Границы заданы Доктором под конкретного пациента, а не как общая
-     * медицинская норма. Значения ниже 125 по верхнему давлению помечаются
-     * красным намеренно: при атеросклерозе брахиоцефальных артерий у пожилых
-     * чрезмерное снижение давления так же нежелательно, как повышение.
-     *
-     * ВНИМАНИЕ. В ТЗ не заданы два диапазона: верхнее 140–159 и нижнее
-     * 90–109. Оставить их без отметки означало бы показывать 150/95
-     * как норму, поэтому они помечены красным. Требует подтверждения
-     * Доктора — правится ниже в одной функции.
-     *
-     * Возвращает '' (норма), 'warn' (жёлтое) или 'danger' (красное).
+     * Норма берётся из справочника Norms по возрасту и диагнозам активного
+     * профиля. Отклонение считается от ближайшей границы диапазона:
+     * до 5% — норма, 5–15% — жёлтое, больше 15% — красное.
      * ==================================================================== */
-    NORMS: {
-        ad_top: function (v) {
-            if (v < 125) return 'danger';        // ТЗ: красное
-            if (v <= 139) return 'warn';         // ТЗ: жёлтое 125–139
-            return 'danger';                     // 140 и выше (в ТЗ было ≥160)
-        },
-        ad_bottom: function (v) {
-            if (v < 70) return 'danger';         // ТЗ: красное
-            if (v <= 89) return 'warn';          // ТЗ: жёлтое 70–89
-            return 'danger';                     // 90 и выше (в ТЗ было ≥110)
-        },
-        pulse: function (v) {
-            if (v < 50) return 'danger';
-            if (v <= 59) return 'warn';          // ТЗ: жёлтое 50–59
-            if (v <= 100) return '';             // норма 60–100
-            if (v <= 110) return 'warn';         // ТЗ: жёлтое 101–110
-            return 'danger';                     // ТЗ: красное больше 110
-        },
-        spo2: function (v) {
-            if (v < 92) return 'danger';         // ТЗ: красное
-            if (v <= 94) return 'warn';          // ТЗ: жёлтое 92–94
-            return '';
-        },
-        sugar: function (v) {
-            if (v < 4.5) return 'danger';        // ТЗ: красное
-            if (v <= 4.9) return 'warn';         // ТЗ: жёлтое 4.5–4.9
-            if (v <= 6.0) return '';             // норма 5.0–6.0
-            if (v <= 7.0) return 'warn';         // ТЗ: жёлтое 6.1–7.0
-            return 'danger';                     // ТЗ: красное больше 7.0
-        },
-        // Температуру ТЗ не описывает — оставлены прежние границы
-        temp: function (v) {
-            if (v < 35.0 || v >= 38.5) return 'danger';
-            if (v < 35.5 || v >= 37.1) return 'warn';
-            return '';
-        }
+
+    /* Показатели, по которым проверяются отклонения */
+    DEV_FIELDS: [
+        { norm: 'ad_top', from: 'ad_top', label: 'АД верх' },
+        { norm: 'ad_bottom', from: 'ad_bottom', label: 'АД низ' },
+        { norm: 'pulse', from: 'pulse', label: 'Пульс' },
+        { norm: 'spo2', from: 'spo2', label: 'SpO2' },
+        { norm: 'sugar', from: 'sugar', label: 'Сахар' },
+        { norm: 'temp', from: 'temperature', label: 't°' },
+        { norm: 'bmi', from: '_bmi', label: 'ИМТ' }
+    ],
+
+    /* Статья норм для активного профиля; null — если данных в карточке мало */
+    article: function () {
+        return Norms.articleFor(Storage.getActiveProfile());
     },
 
-    /* Понятные названия показателей для перечня отклонений */
-    LABELS: {
-        ad_top: 'АД верх',
-        ad_bottom: 'АД низ',
-        pulse: 'Пульс',
-        spo2: 'SpO2',
-        sugar: 'Сахар',
-        temp: 't°'
-    },
-
+    /* Уровень отклонения одного значения: '', 'warn' или 'danger' */
     level: function (field, value) {
-        var fn = Diary.NORMS[field];
-        if (!fn || value === null || value === undefined || value === '') return '';
-        return fn(Number(value));
+        var res = Norms.check(Diary.article(), field, value);
+        return res ? res.level : '';
     },
 
-    /* Оборачивает текст значения в цветную метку, если оно вне границ.
+    /* Оборачивает текст значения в цветную метку, если есть отклонение.
        Для давления на вход приходит пара [верхнее, нижнее]. */
     mark: function (field, value, text) {
         var lvl;
@@ -1638,53 +1680,73 @@ var Diary = {
     },
 
     /* ----------------------------------------------------------------------
-     * Полный перечень отклонений за день: время, показатель, значение, цвет.
-     * Значения в норме в перечень не попадают.
+     * Перечень отклонений за день: время, показатель, значение, норма,
+     * процент. Значения в пределах нормы в перечень не попадают.
+     * Красные идут перед жёлтыми (раздел 5 ТЗ).
      * -------------------------------------------------------------------- */
     deviations: function (rec) {
         var out = [];
         if (!rec || !rec.measurements) return out;
 
-        var fields = [
-            { key: 'ad_top', from: 'ad_top' },
-            { key: 'ad_bottom', from: 'ad_bottom' },
-            { key: 'pulse', from: 'pulse' },
-            { key: 'spo2', from: 'spo2' },
-            { key: 'sugar', from: 'sugar' },
-            { key: 'temp', from: 'temperature' }
-        ];
+        var article = Diary.article();
+        if (!article) return out;   // без даты рождения норму не подобрать
+
+        var profile = Storage.getActiveProfile();
+        var height = profile ? profile.height : null;
 
         var rows = Diary.validRows(rec.measurements);
         rows.sort(function (a, b) { return a.time < b.time ? -1 : 1; });
 
         for (var i = 0; i < rows.length; i++) {
             var m = rows[i];
-            for (var j = 0; j < fields.length; j++) {
-                var f = fields[j];
-                var v = m[f.from];
-                var lvl = Diary.level(f.key, v);
-                if (lvl) {
-                    out.push({
-                        time: m.time,
-                        label: Diary.LABELS[f.key],
-                        value: v,
-                        level: lvl
-                    });
-                }
+
+            for (var j = 0; j < Diary.DEV_FIELDS.length; j++) {
+                var f = Diary.DEV_FIELDS[j];
+
+                // ИМТ не хранится, а считается по весу и росту из карточки
+                var value = (f.from === '_bmi')
+                    ? Norms.bmi(m.weight, height)
+                    : m[f.from];
+
+                var res = Norms.check(article, f.norm, value);
+                if (!res || !res.level) continue;
+
+                out.push({
+                    time: m.time,
+                    label: f.label,
+                    value: value,
+                    bound: res.bound,
+                    range: res.range,
+                    percent: res.percent,
+                    level: res.level
+                });
             }
         }
+
+        // Сначала красные, внутри группы — по времени
+        out.sort(function (a, b) {
+            if (a.level !== b.level) return a.level === 'danger' ? -1 : 1;
+            return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0);
+        });
         return out;
+    },
+
+    /* Сколько красных и жёлтых отклонений за день */
+    dayCounts: function (rec) {
+        var devs = Diary.deviations(rec);
+        var danger = 0, warn = 0;
+        for (var i = 0; i < devs.length; i++) {
+            if (devs[i].level === 'danger') danger++; else warn++;
+        }
+        return { danger: danger, warn: warn, total: devs.length };
     },
 
     /* Худший уровень за весь день */
     dayLevel: function (rec) {
-        var devs = Diary.deviations(rec);
-        var worst = '';
-        for (var i = 0; i < devs.length; i++) {
-            if (devs[i].level === 'danger') return 'danger';
-            worst = 'warn';
-        }
-        return worst;
+        var c = Diary.dayCounts(rec);
+        if (c.danger > 0) return 'danger';
+        if (c.warn > 0) return 'warn';
+        return '';
     },
 
     /* ----------------------------------------------------------------------

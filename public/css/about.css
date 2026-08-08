@@ -163,3 +163,43 @@
     font-weight: 600;
     vertical-align: middle;
 }
+
+/* --- Выбор диагнозов в карточке профиля ---------------------------------- */
+.field-hint {
+    font-size: 15px;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.diag-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-xs);
+}
+
+.diag-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    min-height: var(--touch-min);
+    padding: 0 var(--spacing-xs);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--font-size-small);
+    user-select: none;
+}
+
+.diag-item:hover {
+    background: var(--color-primary-light);
+}
+
+.diag-item input {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}

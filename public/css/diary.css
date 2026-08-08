@@ -232,6 +232,16 @@
     font-weight: 700;
 }
 
+.dv-dev-norm {
+    color: var(--color-text-secondary);
+    font-size: 15px;
+}
+
+.dv-dev-pct {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 .dv-dev-more {
     font-size: 15px;
     color: var(--color-text-secondary);
@@ -376,7 +386,20 @@
 
 /* --- Кнопка «Отметить все» ------------------------------------------------ */
 .dv-selectall {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
     margin-bottom: var(--spacing-xs);
+}
+
+.dv-btn-danger {
+    color: var(--color-danger);
+}
+
+.dv-btn-danger:hover,
+.dv-btn-danger:focus {
+    border-color: var(--color-danger);
+    color: var(--color-danger);
 }
 
 .dv-selectall .btn {
@@ -571,6 +594,20 @@
     font-weight: 600;
     color: var(--color-text-secondary);
     padding: 6px 0 !important;
+}
+
+/* Ячейка веса: под полем ввода подпись с рассчитанным ИМТ */
+.dv-c-weight {
+    min-width: 92px;
+    padding: 2px 0 4px !important;
+}
+
+.dv-bmi {
+    display: block;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.2;
+    min-height: 15px;
 }
 
 .dv-cell {

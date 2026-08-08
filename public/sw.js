@@ -1,4 +1,4 @@
-var CACHE_NAME = 'mdd-v20';
+var CACHE_NAME = 'mdd-v21';
 var ASSETS = [
     './',
     './index.html',
@@ -13,6 +13,7 @@ var ASSETS = [
     './vendor/jspdf.umd.min.js',
     './js/app.js',
     './js/storage.js',
+    './js/norms.js',
     './js/profiles.js',
     './js/doctor.js',
     './js/diary.js',
