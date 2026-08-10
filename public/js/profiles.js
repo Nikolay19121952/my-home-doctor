@@ -161,7 +161,8 @@ var Profiles = {
             { label: 'Пол', value: profile.gender === 'male' ? 'Мужской' : (profile.gender === 'female' ? 'Женский' : '') },
             { label: 'Группа крови', value: profile.bloodType || '' },
             { label: 'Рост', value: profile.height ? profile.height + ' см' : '' },
-            { label: 'Хронические заболевания', value: profile.chronicConditions || '' },
+            { label: 'Диагнозы', value: Profiles.diagnosisTitles(profile) },
+            { label: 'Другие заболевания и уточнения', value: profile.chronicConditions || '' },
             { label: 'Аллергии', value: profile.allergies || '' },
             { label: 'Принимаемые лекарства', value: profile.medications || '' },
             { label: 'Перенесённые операции', value: profile.surgeries || '' },
@@ -194,20 +195,26 @@ var Profiles = {
         var host = document.getElementById('profile-diagnoses');
         if (!host) return;
 
+        var marked = Norms.normalizeIds(selected);
         var list = Norms.DIAGNOSIS_LIST();
         var html = '';
         for (var i = 0; i < list.length; i++) {
             var d = list[i];
-            var checked = selected.indexOf(d.id) !== -1 ? ' checked' : '';
-            html += '<label class="diag-item">' +
+            var checked = marked.indexOf(d.id) !== -1 ? ' checked' : '';
+            html += '<label class="diag-item" data-group="' + (d.group || '') + '">' +
                 '<input type="checkbox" value="' + d.id + '"' + checked +
                 ' onchange="Profiles.onDiagnosisChange(this)">' +
                 '<span>' + UI.escapeHtml(d.title) + '</span></label>';
         }
         host.innerHTML = html;
+        Profiles.applyDiagnosisLocks();
     },
 
-    /* «Хронических заболеваний нет» несовместимо с остальными отметками */
+    /* ----------------------------------------------------------------------
+     * Раздел 2 ТЗ: диагнозы одной группы взаимно исключают друг друга.
+     * Степень гипертонии может быть только одна, тип диабета тоже один.
+     * «Хронических заболеваний нет» несовместимо со всеми остальными.
+     * -------------------------------------------------------------------- */
     onDiagnosisChange: function (input) {
         var host = document.getElementById('profile-diagnoses');
         var boxes = host.querySelectorAll('input[type="checkbox"]');
@@ -217,10 +224,64 @@ var Profiles = {
                 if (boxes[i].value !== 'none') boxes[i].checked = false;
             }
         } else if (input.checked) {
+            var conflicts = Norms.conflictsWith(input.value);
             for (var j = 0; j < boxes.length; j++) {
-                if (boxes[j].value === 'none') boxes[j].checked = false;
+                if (boxes[j].value === 'none' ||
+                    conflicts.indexOf(boxes[j].value) !== -1) {
+                    boxes[j].checked = false;
+                }
             }
         }
+        Profiles.applyDiagnosisLocks();
+    },
+
+    /* Гасит пункты, недоступные из-за уже сделанного выбора в группе */
+    applyDiagnosisLocks: function () {
+        var host = document.getElementById('profile-diagnoses');
+        if (!host) return;
+
+        var boxes = host.querySelectorAll('input[type="checkbox"]');
+        var takenGroups = {};
+
+        for (var i = 0; i < boxes.length; i++) {
+            if (!boxes[i].checked) continue;
+            var a = Norms.byId(boxes[i].value);
+            if (a && a.group) takenGroups[a.group] = boxes[i].value;
+        }
+
+        for (var j = 0; j < boxes.length; j++) {
+            var b = Norms.byId(boxes[j].value);
+            var group = b && b.group;
+            var locked = !!(group && takenGroups[group] &&
+                takenGroups[group] !== boxes[j].value);
+
+            boxes[j].disabled = locked;
+            var item = boxes[j].parentNode;
+            if (locked) {
+                item.classList.add('diag-locked');
+                item.title = 'Уже отмечен другой пункт из этой группы — ' +
+                    'снимите его, чтобы выбрать этот';
+            } else {
+                item.classList.remove('diag-locked');
+                item.removeAttribute('title');
+            }
+        }
+    },
+
+    /* Названия отмеченных диагнозов одной строкой — для карточки и для чата */
+    diagnosisTitles: function (profile) {
+        if (!profile) return '';
+        var ids = profile.diagnoses;
+        if (!ids) ids = Norms.guessFromText(profile.chronicConditions);
+        ids = Norms.normalizeIds(ids);
+
+        var out = [];
+        for (var i = 0; i < ids.length; i++) {
+            var a = Norms.byId(ids[i]);
+            if (a) out.push(a.title);
+        }
+        if (out.length === 0 && profile.diagnoses) return 'Хронических заболеваний нет';
+        return out.join(', ');
     },
 
     selectedDiagnoses: function () {

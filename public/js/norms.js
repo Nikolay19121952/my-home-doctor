@@ -1,124 +1,171 @@
 /* ============================================================================
- * ИНДИВИДУАЛЬНЫЕ НОРМЫ ИЗМЕРЕНИЙ — версия 3.1 часть 2
- * Реализация по ТЗ «Доработки v3.1 — часть 2: индивидуальные нормы и ИМТ».
+ * ИНДИВИДУАЛЬНЫЕ НОРМЫ ИЗМЕРЕНИЙ — версия 3.2
+ * Реализация по ТЗ «Доработки v3.1 — часть 3 (финальная версия)».
  *
  * Норма подбирается под конкретного человека: по возрасту из даты рождения
  * и по диагнозам из карточки профиля. Отклонение считается от ближайшей
- * границы диапазона — как в примере ТЗ: 125 при норме 140–170 даёт −10.7%.
+ * границы диапазона: 125 при норме 140–180 даёт −10.7%.
  *
- * ВАЖНО. Таблица составлена Доктором под конкретных пациентов, а не как
- * общая медицинская норма. Для гипертонии нормой считается 140–160, потому
- * что это целевой диапазон лечения; у пожилых с атеросклерозом брахиоцефальных
- * артерий чрезмерное снижение давления так же нежелательно, как повышение.
- * Менять границы можно только по согласованию с врачом.
+ * Что изменилось по сравнению с частью 2:
+ *   • гипертония разделена на три степени, диабет — на три типа (раздел 1);
+ *   • диагнозы одной группы взаимно исключают друг друга (раздел 2);
+ *   • диапазоны расширены, чтобы не создавать ложных тревог (раздел 3);
+ *   • у каждой статьи появилось примечание о консультации врача (раздел 4);
+ *   • пороги отклонений: 5–20% жёлтое, свыше 20% красное (раздел 5).
+ *
+ * ВАЖНО. Границы ориентировочные. Они нужны только для предварительной
+ * подсветки при вводе измерений; персональную норму определяет врач.
  * ========================================================================== */
 
 var Norms = {
 
-    /* --- Возрастные статьи (раздел 8 ТЗ) ---------------------------------- */
+    /* Показатели, по которым задаются диапазоны */
+    FIELDS: ['ad_top', 'ad_bottom', 'pulse', 'spo2', 'sugar', 'temp', 'bmi'],
+
+    /* Общее примечание, обязательное по разделу 4 ТЗ */
+    COMMON_NOTE: 'Границы ориентировочные. Для определения вашей персональной ' +
+        'нормы проконсультируйтесь с врачом!',
+
+    /* --- Возрастные статьи ------------------------------------------------ */
     AGE_ARTICLES: [
         {
             id: 'child_3_5', title: 'Дети 3–5 лет', minAge: 3, maxAge: 5,
-            ad_top: [95, 110], ad_bottom: [55, 70], pulse: [80, 130],
+            ad_top: [95, 115], ad_bottom: [55, 75], pulse: [80, 130],
             spo2: [97, 100], sugar: [3.3, 5.5], temp: [36.3, 37.2], bmi: [14.0, 18.5]
         },
         {
             id: 'child_6_11', title: 'Дети 6–11 лет', minAge: 6, maxAge: 11,
-            ad_top: [100, 120], ad_bottom: [60, 75], pulse: [70, 110],
+            ad_top: [100, 125], ad_bottom: [60, 80], pulse: [70, 110],
             spo2: [97, 100], sugar: [3.5, 5.5], temp: [36.2, 37.0], bmi: [14.5, 21.0]
         },
         {
             id: 'teen_12_17', title: 'Подростки 12–17 лет', minAge: 12, maxAge: 17,
-            ad_top: [110, 135], ad_bottom: [65, 85], pulse: [60, 100],
+            ad_top: [110, 140], ad_bottom: [65, 90], pulse: [60, 100],
             spo2: [97, 100], sugar: [3.3, 5.5], temp: [36.2, 37.0], bmi: [16.0, 23.0]
         },
         {
             id: 'young_18_40', title: 'Молодые взрослые 18–40 лет', minAge: 18, maxAge: 40,
-            ad_top: [100, 130], ad_bottom: [60, 85], pulse: [60, 100],
+            ad_top: [100, 135], ad_bottom: [60, 90], pulse: [60, 100],
             spo2: [96, 100], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: [18.5, 24.9]
         },
         {
             id: 'adult_41_64', title: 'Взрослые 41–64 года', minAge: 41, maxAge: 64,
-            ad_top: [110, 135], ad_bottom: [65, 85], pulse: [60, 100],
+            ad_top: [110, 140], ad_bottom: [65, 90], pulse: [60, 100],
             spo2: [95, 100], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: [18.5, 24.9]
         },
         {
             id: 'senior_65', title: 'Пожилые 65 лет и старше', minAge: 65, maxAge: 200,
-            ad_top: [120, 140], ad_bottom: [75, 90], pulse: [55, 85],
+            ad_top: [120, 150], ad_bottom: [75, 95], pulse: [55, 85],
             spo2: [94, 98], sugar: [4.0, 6.5], temp: [36.0, 36.7], bmi: [20.0, 28.0]
-        },
-        {
-            id: 'pregnant', title: 'Беременность', minAge: 0, maxAge: 200,
-            ad_top: [100, 140], ad_bottom: [60, 90], pulse: [70, 100],
-            spo2: [95, 100], sugar: [3.5, 7.5], temp: [36.3, 37.0], bmi: null
         }
     ],
 
     /* ----------------------------------------------------------------------
-     * Статьи по диагнозам (раздел 8 ТЗ).
+     * Статьи по диагнозам (раздел 3 ТЗ, таблица с расширенными границами).
      *
-     * priority — какой диагноз берётся, если у человека их несколько.
-     * Порядок предложен разработчиком и требует подтверждения врача:
-     * выше стоят состояния, которые сильнее сужают контроль показателей.
+     * group — группа взаимоисключающих диагнозов: степень гипертонии может
+     * быть только одна, тип диабета тоже один (раздел 2 ТЗ).
      * -------------------------------------------------------------------- */
     DIAGNOSIS_ARTICLES: [
         {
-            id: 'hypertension_bca', title: 'Гипертония с атеросклерозом БЦА',
-            short: 'Гипертония + атеросклероз БЦА', priority: 10, minAge: 18,
-            ad_top: [140, 170], ad_bottom: [90, 110], pulse: [55, 80],
-            spo2: [94, 100], sugar: [4.0, 6.5], temp: [36.0, 36.8], bmi: [20.0, 28.0]
+            id: 'hypertension1', title: 'Гипертония 1-й степени',
+            short: 'Гипертония 1 ст.', group: 'hypertension', minAge: 18,
+            ad_top: [140, 180], ad_bottom: [90, 110], pulse: [55, 90],
+            spo2: [95, 100], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: [18.5, 27.0],
+            note: 'Границы ориентировочные, уточните с врачом.'
         },
         {
-            id: 'copd', title: 'ХОБЛ', short: 'ХОБЛ', priority: 20, minAge: 40,
-            ad_top: [120, 140], ad_bottom: [75, 90], pulse: [60, 95],
-            spo2: [92, 96], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: [18.5, 25.0]
+            id: 'hypertension2', title: 'Гипертония 2-й степени',
+            short: 'Гипертония 2 ст.', group: 'hypertension', minAge: 18,
+            ad_top: [160, 200], ad_bottom: [100, 120], pulse: [55, 90],
+            spo2: [95, 100], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: [18.5, 27.0],
+            note: 'Требует постоянного контроля, консультируйтесь с врачом.'
         },
         {
-            id: 'heart_failure', title: 'Хроническая сердечная недостаточность',
-            short: 'ХСН', priority: 30, minAge: 50,
-            ad_top: [100, 130], ad_bottom: [60, 80], pulse: [50, 80],
-            spo2: [95, 100], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: [18.5, 25.0]
+            id: 'hypertension3', title: 'Гипертония 3-й степени',
+            short: 'Гипертония 3 ст.', group: 'hypertension', minAge: 18,
+            ad_top: [180, 220], ad_bottom: [120, 140], pulse: [55, 90],
+            spo2: [95, 100], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: [18.5, 27.0],
+            note: 'Критично! Требует немедленного контроля и консультации врача.'
         },
         {
-            id: 'ckd', title: 'Хроническая болезнь почек (3–4 стадия)',
-            short: 'ХБП 3–4', priority: 40, minAge: 50,
-            ad_top: [130, 140], ad_bottom: [80, 90], pulse: [60, 90],
-            spo2: [95, 100], sugar: [4.0, 6.5], temp: [36.2, 36.9], bmi: [18.5, 25.0]
+            id: 'hypertension_bca', title: 'Гипертония 2-й степени с атеросклерозом БЦА',
+            short: 'Гипертония 2 ст. + атеросклероз БЦА',
+            group: 'hypertension', minAge: 70,
+            ad_top: [110, 180], ad_bottom: [65, 110], pulse: [55, 80],
+            spo2: [94, 100], sugar: [4.0, 6.5], temp: [36.0, 36.8], bmi: [20.0, 28.0],
+            note: 'Сужение сосудов требует особого контроля. ' +
+                'Ваша персональная норма определяется врачом!'
         },
         {
             id: 'diabetes1', title: 'Сахарный диабет 1 типа',
-            short: 'Диабет 1 типа', priority: 50, minAge: 0, maxAge: 17,
-            ad_top: [110, 130], ad_bottom: [65, 85], pulse: [60, 100],
-            spo2: [97, 100], sugar: [4.5, 7.5], temp: [36.2, 37.0], bmi: [18.5, 23.0]
+            short: 'Диабет 1 типа', group: 'diabetes', minAge: 0,
+            ad_top: [110, 135], ad_bottom: [65, 85], pulse: [60, 100],
+            spo2: [97, 100], sugar: [4.5, 8.5], sugarAfterMeal: [4.5, 10.0],
+            temp: [36.2, 37.0], bmi: [18.5, 23.0],
+            note: 'Контроль сахара критичен! Целевые значения уточняются с эндокринологом.'
         },
         {
             id: 'diabetes2', title: 'Сахарный диабет 2 типа',
-            short: 'Диабет 2 типа', priority: 55, minAge: 40,
-            ad_top: [130, 140], ad_bottom: [80, 90], pulse: [60, 90],
-            spo2: [95, 100], sugar: [5.5, 7.0], temp: [36.2, 36.9], bmi: [18.5, 25.0]
+            short: 'Диабет 2 типа', group: 'diabetes', minAge: 40,
+            ad_top: [130, 150], ad_bottom: [80, 100], pulse: [60, 90],
+            spo2: [95, 100], sugar: [4.5, 8.5], sugarAfterMeal: [4.5, 10.0],
+            temp: [36.2, 36.9], bmi: [18.5, 25.0],
+            note: 'Требует постоянного мониторинга, уточните норму с эндокринологом.'
         },
         {
-            id: 'hypertension', title: 'Гипертония', short: 'Гипертония',
-            priority: 60, minAge: 18,
-            ad_top: [140, 160], ad_bottom: [90, 100], pulse: [55, 85],
-            spo2: [95, 100], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: [18.5, 27.0]
+            id: 'diabetes3', title: 'Сахарный диабет 3 типа',
+            short: 'Диабет 3 типа', group: 'diabetes', minAge: 0,
+            ad_top: [110, 140], ad_bottom: [65, 90], pulse: [60, 100],
+            spo2: [95, 100], sugar: [4.5, 8.5], sugarAfterMeal: [4.5, 10.0],
+            temp: [36.2, 36.9], bmi: [18.5, 25.0],
+            note: 'Редкая форма, требует специализированной консультации.'
         },
         {
-            id: 'arrhythmia', title: 'Аритмия', short: 'Аритмия',
-            priority: 70, minAge: 18,
-            ad_top: [100, 140], ad_bottom: [60, 90], pulse: [50, 110],
-            spo2: [95, 100], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: [18.5, 25.0]
+            id: 'copd', title: 'ХОБЛ', short: 'ХОБЛ', minAge: 40,
+            ad_top: [120, 150], ad_bottom: [75, 95], pulse: [60, 95],
+            spo2: [90, 96], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: [18.5, 25.0],
+            note: 'Сатурация ниже 90% требует дополнительного кислорода!'
         },
         {
-            id: 'hypothyroidism', title: 'Гипотиреоз', short: 'Гипотиреоз',
-            priority: 80, minAge: 18,
-            ad_top: [110, 135], ad_bottom: [65, 85], pulse: [50, 75],
-            spo2: [95, 100], sugar: [3.3, 5.5], temp: [35.8, 36.4], bmi: [20.0, 28.0]
+            id: 'heart_failure', title: 'Хроническая сердечная недостаточность',
+            short: 'ХСН', minAge: 50,
+            ad_top: [95, 135], ad_bottom: [55, 85], pulse: [50, 85],
+            spo2: [95, 100], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: [18.5, 25.0],
+            note: 'Низкое давление может быть опасно! ' +
+                'Контролируйте слабость и одышку.'
         },
         {
-            id: 'anemia', title: 'Анемия', short: 'Анемия', priority: 90, minAge: 0,
-            ad_top: [100, 130], ad_bottom: [60, 85], pulse: [70, 100],
-            spo2: [94, 100], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: null
+            id: 'arrhythmia', title: 'Аритмия', short: 'Аритмия', minAge: 18,
+            ad_top: [100, 145], ad_bottom: [60, 95], pulse: [40, 120],
+            spo2: [95, 100], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: [18.5, 25.0],
+            note: 'Главное — регулярность пульса, а не его частота. ' +
+                'Перебои требуют консультации кардиолога.'
+        },
+        {
+            id: 'hypothyroidism', title: 'Гипотиреоз', short: 'Гипотиреоз', minAge: 18,
+            ad_top: [110, 140], ad_bottom: [65, 90], pulse: [50, 80],
+            spo2: [95, 100], sugar: [3.3, 5.5], temp: [35.5, 36.5], bmi: [20.0, 28.0],
+            note: 'Низкая температура вместе с усталостью — проверьте лечение.'
+        },
+        {
+            id: 'anemia', title: 'Анемия', short: 'Анемия', minAge: 0,
+            ad_top: [100, 135], ad_bottom: [60, 90], pulse: [70, 110],
+            spo2: [94, 100], sugar: [3.3, 5.5], temp: [36.2, 36.9], bmi: null,
+            note: 'Высокий пульс при нормальном давлении — типичный признак.'
+        },
+        {
+            id: 'ckd', title: 'Хроническая болезнь почек 3–4 стадии',
+            short: 'ХБП 3–4', minAge: 50,
+            ad_top: [130, 150], ad_bottom: [80, 100], pulse: [60, 90],
+            spo2: [95, 100], sugar: [4.0, 6.5], temp: [36.2, 36.9], bmi: [18.5, 25.0],
+            note: 'Давление критично влияет на почки! Контролируйте его особенно тщательно.'
+        },
+        {
+            id: 'pregnant', title: 'Беременность', short: 'Беременность', minAge: 0,
+            ad_top: [100, 150], ad_bottom: [60, 95], pulse: [70, 100],
+            spo2: [95, 100], sugar: [3.5, 8.0], temp: [36.3, 37.0], bmi: null,
+            note: 'Набор веса — строго по графику триместров, наблюдение у врача обязательно.'
         }
     ],
 
@@ -127,17 +174,19 @@ var Norms = {
         var out = [{ id: 'none', title: 'Хронических заболеваний нет' }];
         for (var i = 0; i < Norms.DIAGNOSIS_ARTICLES.length; i++) {
             var a = Norms.DIAGNOSIS_ARTICLES[i];
-            out.push({ id: a.id, title: a.title });
+            out.push({ id: a.id, title: a.title, group: a.group || '' });
         }
-        out.push({ id: 'pregnant', title: 'Беременность' });
         return out;
     },
 
     /* Ключевые слова для переноса диагнозов, записанных текстом */
     KEYWORDS: [
-        { id: 'hypertension_bca', words: ['атеросклероз'] },
-        { id: 'hypertension', words: ['гипертони', 'гипертензи'] },
+        { id: 'hypertension_bca', words: ['атеросклероз бца', 'атеросклероз брахиоцефал'] },
+        { id: 'hypertension3', words: ['гипертония 3', 'гипертензия 3', 'гипертони́ческая 3'] },
+        { id: 'hypertension2', words: ['гипертония 2', 'гипертензия 2'] },
+        { id: 'hypertension1', words: ['гипертони', 'гипертензи'] },
         { id: 'diabetes1', words: ['диабет 1', 'диабет i тип', 'диабета 1'] },
+        { id: 'diabetes3', words: ['диабет 3', 'диабета 3', 'панкреатогенн'] },
         { id: 'diabetes2', words: ['диабет 2', 'диабет ii тип', 'диабета 2', 'сахарный диабет'] },
         { id: 'copd', words: ['хобл', 'обструктивн'] },
         { id: 'heart_failure', words: ['сердечная недостаточность', 'хсн'] },
@@ -163,15 +212,65 @@ var Norms = {
                 }
             }
         }
-        // «Гипертония + атеросклероз» — только когда есть и то, и другое
-        if (found.indexOf('hypertension_bca') !== -1 && found.indexOf('hypertension') === -1) {
-            found.splice(found.indexOf('hypertension_bca'), 1);
+        return Norms.dropGroupDuplicates(found);
+    },
+
+    /* ----------------------------------------------------------------------
+     * До версии 3.2 гипертония и диабет были единым пунктом без степени.
+     * Карточки, заполненные раньше, переводим на новые идентификаторы.
+     * -------------------------------------------------------------------- */
+    LEGACY_IDS: {
+        hypertension: 'hypertension1',
+        diabetes: 'diabetes2'
+    },
+
+    normalizeIds: function (ids) {
+        if (!ids) return [];
+        var out = [];
+        for (var i = 0; i < ids.length; i++) {
+            var id = Norms.LEGACY_IDS[ids[i]] || ids[i];
+            if (Norms.byId(id) && out.indexOf(id) === -1) out.push(id);
         }
-        return found;
+        return Norms.dropGroupDuplicates(out);
+    },
+
+    /* В каждой группе оставляем только первый найденный диагноз */
+    dropGroupDuplicates: function (ids) {
+        var seen = {};
+        var out = [];
+        for (var i = 0; i < ids.length; i++) {
+            var a = Norms.byId(ids[i]);
+            var g = a && a.group;
+            if (g) {
+                if (seen[g]) continue;
+                seen[g] = true;
+            }
+            out.push(ids[i]);
+        }
+        return out;
+    },
+
+    /* Идентификаторы диагнозов, несовместимых с указанным */
+    conflictsWith: function (id) {
+        var a = Norms.byId(id);
+        var out = [];
+        if (!a || !a.group) return out;
+        for (var i = 0; i < Norms.DIAGNOSIS_ARTICLES.length; i++) {
+            var b = Norms.DIAGNOSIS_ARTICLES[i];
+            if (b.id !== id && b.group === a.group) out.push(b.id);
+        }
+        return out;
     },
 
     /* ======================================================================
-     * ВЫБОР СТАТЬИ ПОД ПРОФИЛЬ (раздел 2 ТЗ)
+     * ВЫБОР НОРМЫ ПОД ПРОФИЛЬ
+     *
+     * Диагнозов может быть отмечено несколько, и тогда встаёт вопрос, чью
+     * строку таблицы брать. Приложение не выбирает одну, а объединяет
+     * границы по каждому показателю отдельно: нижняя граница — самая низкая
+     * из отмеченных статей, верхняя — самая высокая. Так у человека с ХОБЛ
+     * и гипертонией сатурация проверяется по ХОБЛ, а давление — по
+     * гипертонии, и диагнозы не «спорят» друг с другом.
      * ==================================================================== */
     articleFor: function (profile) {
         if (!profile) return null;
@@ -179,34 +278,62 @@ var Norms = {
         var age = UI.calculateAge(profile.birthDate);
         if (age === null) return null;   // без даты рождения норму не подобрать
 
-        var diagnoses = profile.diagnoses || [];
+        var sources = Norms.sourcesFor(profile, age);
+        if (sources.length === 0) return Norms.ageArticle(age);
+        if (sources.length === 1) return sources[0];
+        return Norms.merge(sources);
+    },
 
-        // Беременность важнее прочих статей
-        if (diagnoses.indexOf('pregnant') !== -1) {
-            return Norms.withBmiFallback(Norms.byId('pregnant'), age);
-        }
+    /* Статьи диагнозов, подходящие профилю по возрасту, с заполненным ИМТ */
+    sourcesFor: function (profile, age) {
+        var diagnoses = Norms.normalizeIds((profile && profile.diagnoses) || []);
+        var out = [];
 
-        // Из диагнозов берём тот, что стоит выше в порядке приоритета
-        var best = null;
         for (var i = 0; i < Norms.DIAGNOSIS_ARTICLES.length; i++) {
             var a = Norms.DIAGNOSIS_ARTICLES[i];
             if (diagnoses.indexOf(a.id) === -1) continue;
-
-            // Статья применяется, только если подходит по возрасту
             if (a.minAge !== undefined && age < a.minAge) continue;
             if (a.maxAge !== undefined && age > a.maxAge) continue;
-
-            if (!best || a.priority < best.priority) best = a;
+            out.push(Norms.withBmiFallback(a, age));
         }
-        if (best) return Norms.withBmiFallback(best, age);
+        return out;
+    },
 
-        return Norms.ageArticle(age);
+    /* Объединение границ нескольких статей */
+    merge: function (sources) {
+        var merged = {
+            id: 'merged',
+            title: '',
+            sources: [],
+            notes: []
+        };
+
+        var titles = [];
+        for (var i = 0; i < sources.length; i++) {
+            titles.push(sources[i].short || sources[i].title);
+            merged.sources.push(sources[i].id);
+            if (sources[i].note) merged.notes.push(sources[i].note);
+        }
+        merged.title = titles.join(' + ');
+
+        for (var f = 0; f < Norms.FIELDS.length; f++) {
+            var field = Norms.FIELDS[f];
+            var min = null, max = null;
+
+            for (var s = 0; s < sources.length; s++) {
+                var range = sources[s][field];
+                if (!range) continue;
+                if (min === null || range[0] < min) min = range[0];
+                if (max === null || range[1] > max) max = range[1];
+            }
+            merged[field] = (min === null) ? null : [min, max];
+        }
+        return merged;
     },
 
     ageArticle: function (age) {
         for (var i = 0; i < Norms.AGE_ARTICLES.length; i++) {
             var a = Norms.AGE_ARTICLES[i];
-            if (a.id === 'pregnant') continue;
             if (age >= a.minAge && age <= a.maxAge) return a;
         }
         // Младше трёх лет отдельной статьи нет
@@ -233,16 +360,23 @@ var Norms = {
         return copy;
     },
 
+    /* Примечания статьи (или всех объединённых статей) одной строкой */
+    noteFor: function (article) {
+        if (!article) return '';
+        if (article.notes && article.notes.length) return article.notes.join(' ');
+        return article.note || '';
+    },
+
     /* ======================================================================
-     * ОТКЛОНЕНИЕ ОТ НОРМЫ (раздел 4 ТЗ)
+     * ОТКЛОНЕНИЕ ОТ НОРМЫ (раздел 5 ТЗ)
      *
      * Норма задана диапазоном, поэтому отклонение считается от ближайшей
      * границы: значение внутри диапазона отклонением не считается.
-     * Проверка на примере ТЗ: 125 при диапазоне 140–170 → (125−140)/140,
+     * Проверка на примере: 125 при диапазоне 140–180 → (125 − 140) / 140,
      * то есть −10.7% и жёлтая отметка.
      * ==================================================================== */
     WARN_PERCENT: 5,
-    DANGER_PERCENT: 15,
+    DANGER_PERCENT: 20,
 
     check: function (article, field, value) {
         if (!article || value === null || value === undefined || value === '') return null;
@@ -278,7 +412,7 @@ var Norms = {
     },
 
     /* ======================================================================
-     * ИНДЕКС МАССЫ ТЕЛА (раздел 3 ТЗ)
+     * ИНДЕКС МАССЫ ТЕЛА
      * ==================================================================== */
     bmi: function (weightKg, heightCm) {
         var w = Number(weightKg);

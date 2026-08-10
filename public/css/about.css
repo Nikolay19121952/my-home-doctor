@@ -203,3 +203,17 @@
     accent-color: var(--color-primary);
     cursor: pointer;
 }
+
+/* Пункт недоступен: в этой группе уже отмечен другой диагноз */
+.diag-item.diag-locked {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.diag-item.diag-locked:hover {
+    background: transparent;
+}
+
+.diag-item.diag-locked input {
+    cursor: not-allowed;
+}

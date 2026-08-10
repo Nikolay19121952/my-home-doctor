@@ -241,7 +241,11 @@ var Doctor = {
             }
             if (p.gender) parts.push(p.gender === 'male' ? 'мужчина' : 'женщина');
             if (p.height) parts.push('рост: ' + p.height + ' см');
-            if (p.chronicConditions) parts.push('диагнозы: ' + p.chronicConditions);
+            var picked = Profiles.diagnosisTitles(p);
+            if (picked) parts.push('диагнозы: ' + picked);
+            if (p.chronicConditions) {
+                parts.push((picked ? 'уточнения: ' : 'диагнозы: ') + p.chronicConditions);
+            }
             if (p.allergies) parts.push('аллергии: ' + p.allergies);
             if (p.medications) parts.push('лекарства: ' + p.medications);
             if (p.surgeries) parts.push('операции: ' + p.surgeries);
