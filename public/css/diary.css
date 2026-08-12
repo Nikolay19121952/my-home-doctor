@@ -228,6 +228,14 @@
     color: #8B0000;
 }
 
+/* Сработавшая тревога уровня 1 — заметнее обычного отклонения */
+.dv-dev-alarm {
+    background: #FFE0E0;
+    border-left-color: #B71C1C;
+    color: #7A0000;
+    font-weight: 600;
+}
+
 .dv-dev-time {
     font-weight: 700;
 }
@@ -639,6 +647,13 @@
 .dv-cell-warn {
     background: #FFFFCC;
     box-shadow: inset 0 0 0 2px #FFA500;
+}
+
+/* Значение, на которое сработала тревога уровня 1 */
+.dv-cell-alarm {
+    background: #FFDADA;
+    box-shadow: inset 0 0 0 3px #B71C1C;
+    font-weight: 700;
 }
 
 /* --- Чат консультаций (макет №4) ----------------------------------------- */

@@ -313,10 +313,17 @@ var Doctor = {
 
                     history.push({ role: 'user', content: text });
                     history.push({ role: 'assistant', content: reply });
+                    var trimmed = false;
                     if (history.length > 40) {
                         history = history.slice(history.length - 40);
+                        trimmed = true;
                     }
                     Doctor.saveHistory(history);
+
+                    // Номер ответа в истории — без него под свежим сообщением
+                    // не появлялась кнопка «Удалить» (она возвращалась только
+                    // после перезагрузки страницы)
+                    var idx = history.length - 1;
 
                     if (hasMore) {
                         Doctor._accumulatedParts.push(reply);
@@ -325,11 +332,15 @@ var Doctor = {
                     } else if (Doctor._accumulatedParts.length > 0) {
                         Doctor._accumulatedParts.push(reply);
                         var fullText = Doctor._accumulatedParts.join('\n\n');
-                        Doctor.addBubble('assistant', reply, true, fullText);
+                        Doctor.addBubble('assistant', reply, true, fullText, idx);
                         Doctor._accumulatedParts = [];
                     } else {
-                        Doctor.addBubble('assistant', reply);
+                        Doctor.addBubble('assistant', reply, undefined, undefined, idx);
                     }
+
+                    // При обрезке истории номера всех прежних сообщений
+                    // сдвигаются — перерисовываем чат целиком
+                    if (trimmed && !hasMore) Doctor.renderHistory();
                 } catch (e) {
                     Doctor._accumulatedParts = [];
                     Doctor.addBubble('assistant', 'Произошла ошибка при обработке ответа.');
@@ -413,7 +424,7 @@ var Doctor = {
                     } else {
                         Doctor._accumulatedParts.push(reply);
                         var fullText = Doctor._accumulatedParts.join('\n\n');
-                        Doctor.addBubble('assistant', reply, true, fullText);
+                        Doctor.addBubble('assistant', reply, true, fullText, history.length - 1);
                         Doctor._accumulatedParts = [];
                     }
                 } catch (e) {

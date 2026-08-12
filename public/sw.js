@@ -1,4 +1,4 @@
-var CACHE_NAME = 'mdd-v22';
+var CACHE_NAME = 'mdd-v23';
 var ASSETS = [
     './',
     './index.html',
@@ -7,10 +7,8 @@ var ASSETS = [
     './css/about.css',
     './css/graphs.css',
     './css/period.css',
-    // Библиотеки графиков и PDF — кэшируются, чтобы работать без интернета
+    // Библиотека графиков — кэшируется, чтобы работать без интернета
     './vendor/chart.umd.js',
-    './vendor/html2canvas.min.js',
-    './vendor/jspdf.umd.min.js',
     './js/app.js',
     './js/storage.js',
     './js/norms.js',

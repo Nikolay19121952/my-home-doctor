@@ -636,210 +636,66 @@ var Graphs = {
     },
 
     /* ======================================================================
-     * ЭКСПОРТ ГРАФИКА В PDF (доработка №6)
+     * ВЫГРУЗКА ГРАФИКА (ТЗ часть 4, пункт 4)
      *
-     * Встроенные шрифты jsPDF не содержат кириллицы — русский текст,
-     * добавленный через pdf.text(), превратился бы в набор знаков вопроса.
-     * Поэтому весь лист (заголовок, график, статистика, таблица) сначала
-     * собирается как обычная HTML-вёрстка, снимается html2canvas в картинку
-     * и уже картинка кладётся в PDF. Кириллица выглядит правильно.
+     * Раньше весь лист снимался html2canvas в одну высокую картинку, а потом
+     * эта картинка резалась на страницы A4 по высоте. Резала она вслепую, не
+     * глядя на содержимое, поэтому строки таблицы рвались пополам на стыке
+     * страниц.
+     *
+     * Теперь документ отдаётся браузеру на печать так же, как дневник за день
+     * и за период: график вставляется картинкой из canvas Chart.js, а таблица
+     * остаётся настоящей таблицей. Браузер сам разбивает её на страницы и по
+     * правилу page-break-inside не рвёт строки. Заодно исчезла зависимость от
+     * html2canvas и jsPDF.
      * ==================================================================== */
     exportPDF: function () {
-        if (!Graphs._meta || Graphs._busy) return;
-
-        Graphs._busy = true;
-        UI.showToast('Создаю PDF...', 4000);
+        if (!Graphs._meta) return;
 
         var meta = Graphs._meta;
-        var sheet = Graphs.buildSheet(meta);
-        document.body.appendChild(sheet);
-
-        // Ждём, пока браузер загрузит картинку графика: без этого лист
-        // измеряется недорисованным и низ документа обрезается
-        Graphs.waitImages(sheet).then(function () {
-            return html2canvas(sheet, Graphs.shotOptions(sheet));
-        })
-                .then(function (canvas) {
-                    document.body.removeChild(sheet);
-
-                    var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-                    var pdf = new jsPDFCtor({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-                    var pageW = pdf.internal.pageSize.getWidth();
-                    var pageH = pdf.internal.pageSize.getHeight();
-                    var margin = 10;
-                    var imgW = pageW - margin * 2;
-                    var imgH = canvas.height * imgW / canvas.width;
-                    var image = canvas.toDataURL('image/jpeg', 0.92);
-
-                    if (imgH <= pageH - margin * 2) {
-                        pdf.addImage(image, 'JPEG', margin, margin, imgW, imgH);
-                    } else {
-                        // Длинный лист режем на страницы
-                        var usableH = pageH - margin * 2;
-                        var offset = 0;
-                        while (offset < imgH) {
-                            pdf.addImage(image, 'JPEG', margin, margin - offset, imgW, imgH);
-                            offset += usableH;
-                            if (offset < imgH) pdf.addPage();
-                        }
-                    }
-
-                    pdf.save(Graphs.fileName(meta));
-
-                    meta.pdfInfo = {
-                        filename: Graphs.fileName(meta),
-                        savedAt: new Date().toISOString(),
-                        status: 'saved'
-                    };
-                    Graphs.save(meta);
-
-                    Graphs._busy = false;
-                    UI.showToast('PDF сохранён: ' + Graphs.fileName(meta), 5000);
-                })
-                .catch(function (err) {
-                    if (sheet.parentNode) document.body.removeChild(sheet);
-                    Graphs._busy = false;
-                    UI.showToast('Не удалось создать PDF: ' + (err && err.message ? err.message : 'ошибка'), 4500);
-                });
-    },
-
-    /* ----------------------------------------------------------------------
-     * Настройки съёмки листа для html2canvas.
-     *
-     * Без явных размеров библиотека снимает лист по ширине окна браузера.
-     * На компьютере окно шире листа и всё попадает целиком, а на смартфоне
-     * окно узкое — и правый край документа отсекался (график, легенда
-     * и статистика обрывались на середине). Поэтому передаём размеры листа
-     * явно и обнуляем прокрутку.
-     * -------------------------------------------------------------------- */
-    shotOptions: function (sheet) {
-        return {
-            scale: 2,
-            backgroundColor: '#FFFFFF',
-            logging: false,
-            // Виртуальное окно шире листа, чтобы на смартфоне документ
-            // не обрезался по ширине экрана
-            windowWidth: Math.max(sheet.offsetWidth, sheet.scrollWidth) + 40
-        };
-    },
-
-    /* Ждём загрузки всех картинок листа (график вставляется как data-URL) */
-    waitImages: function (root) {
-        var imgs = root.querySelectorAll('img');
-        var jobs = [];
-        for (var i = 0; i < imgs.length; i++) {
-            (function (img) {
-                if (img.complete && img.naturalWidth > 0) return;
-                jobs.push(new Promise(function (resolve) {
-                    img.addEventListener('load', resolve);
-                    img.addEventListener('error', resolve);
-                    setTimeout(resolve, 3000);   // подстраховка от зависания
-                }));
-            })(imgs[i]);
-        }
-        return Promise.all(jobs).then(function () {
-            // Ещё один кадр на пересчёт вёрстки после появления картинок
-            return new Promise(function (r) { setTimeout(r, 80); });
-        });
-    },
-
-    /* ----------------------------------------------------------------------
-     * Стили печатного листа.
-     *
-     * Раньше лист опирался на внешний файл graphs.css. html2canvas рисует
-     * копию страницы в отдельном окне и не всегда успевает загрузить туда
-     * внешние стили: на компьютере успевал, на смартфоне — нет, и документ
-     * выходил без оформления, а картинка графика вылезала за правый край
-     * в своём натуральном размере. Теперь стили вкладываются прямо в лист
-     * и не зависят от загрузки файлов.
-     * -------------------------------------------------------------------- */
-    sheetCss: function () {
-        return '<style>' +
-            '.gr-sheet{position:fixed;left:-10000px;top:0;width:780px;background:#FFF;' +
-            'color:#222;font-family:Arial,Helvetica,sans-serif;font-size:13px;' +
-            'line-height:1.5;padding:28px;box-sizing:border-box}' +
-            '.gr-sheet *{box-sizing:border-box}' +
-            '.gr-sheet-head{text-align:center;border-bottom:2px solid #0066CC;' +
-            'padding-bottom:12px;margin-bottom:16px}' +
-            '.gr-sheet-head h1{margin:0;font-size:20px;color:#0066CC}' +
-            '.gr-sheet-head h2{margin:6px 0 8px;font-size:16px;color:#0D47A1}' +
-            '.gr-sheet-head p{margin:2px 0;font-size:13px}' +
-            '.gr-sheet-patient{background:#E6F2FF;border-radius:8px;padding:10px 14px;' +
-            'margin-bottom:14px;font-size:12px}' +
-            '.gr-sheet-chart{text-align:center;margin-bottom:16px}' +
-            '.gr-sheet-chart img{display:block;width:720px;max-width:100%;height:auto;margin:0 auto}' +
-            '.gr-sheet-stats{width:100%;border-collapse:collapse;margin-bottom:18px}' +
-            '.gr-sheet-stats td{border:1px solid #CCC;padding:8px;text-align:center;' +
-            'font-size:13px;background:#F5F5F5}' +
-            '.gr-sheet h3{font-size:15px;color:#0066CC;margin:0 0 8px}' +
-            '.gr-sheet-table{width:100%;border-collapse:collapse;font-size:12px}' +
-            '.gr-sheet-table th{background:#0066CC;color:#FFF;border:1px solid #CCC;' +
-            'padding:6px;text-align:center}' +
-            '.gr-sheet-table td{border:1px solid #CCC;padding:5px 6px;text-align:center}' +
-            '.gr-sheet-table tr:nth-child(even) td{background:#F9F9F9}' +
-            '.gr-sheet-foot{margin-top:18px;padding-top:10px;border-top:1px solid #DDD;' +
-            'text-align:center;color:#999;font-size:11px}' +
-            '</style>';
-    },
-
-    /* Имя файла по образцу из ТЗ: «Дневник график 14 июля 2026 - 20 июля 2026.pdf» */
-    fileName: function (meta) {
-        var start = UI.formatDate(meta.startDate);
-        var end = UI.formatDate(meta.endDate);
-        var range = (start === end) ? start : (start + ' - ' + end);
-        return 'Дневник график ' + range + '.pdf';
-    },
-
-    /* Собирает лист для съёмки: печатная вёрстка на белом фоне */
-    buildSheet: function (meta) {
         var p = Graphs.param(meta.parameter);
         var s = meta.statistics;
         var period = UI.formatDate(meta.startDate);
         if (meta.startDate !== meta.endDate) period += ' — ' + UI.formatDate(meta.endDate);
 
-        var profileCtx = Doctor.getProfileContext();
-        var sheet = document.createElement('div');
-        sheet.className = 'gr-sheet';
-
-        // Стили вкладываем в сам лист — см. комментарий к sheetCss()
-        var html = Graphs.sheetCss();
-
-        html += '<div class="gr-sheet-head">' +
-            '<h1>🩺 Мой домашний доктор</h1>' +
-            '<h2>График измерений</h2>' +
-            '<p><strong>Период:</strong> ' + UI.escapeHtml(period) + '</p>' +
-            '<p><strong>Параметр:</strong> ' + UI.escapeHtml(p.name) + '</p>' +
-            '</div>';
-
-        if (profileCtx) {
-            html += '<div class="gr-sheet-patient">' +
-                UI.escapeHtml(profileCtx).replace(/\n/g, '<br>') + '</div>';
-        }
+        var body = '<h2>График измерений</h2>' +
+            '<p><strong>Период:</strong> ' + UI.escapeHtml(period) + '<br>' +
+            '<strong>Показатель:</strong> ' + UI.escapeHtml(p.name) + '</p>';
 
         // Картинка графика берётся прямо из canvas Chart.js
         var chartCanvas = document.getElementById('gr-canvas');
         if (chartCanvas) {
-            html += '<div class="gr-sheet-chart"><img src="' +
-                chartCanvas.toDataURL('image/png') + '"></div>';
+            body += '<p style="text-align:center"><img src="' +
+                chartCanvas.toDataURL('image/png') +
+                '" style="width:100%;max-width:720px;height:auto"></p>';
         }
 
-        html += '<table class="gr-sheet-stats"><tr>' +
-            '<td><strong>Всего измерений</strong><br>' + s.count + '</td>' +
-            '<td><strong>Минимум</strong><br>' + s.min + '</td>' +
-            '<td><strong>Максимум</strong><br>' + s.max + '</td>' +
-            '<td><strong>Среднее</strong><br>' + s.avg + '</td>' +
+        body += '<table class="grid"><tr>' +
+            '<th>Всего измерений</th><th>Минимум</th><th>Максимум</th><th>Среднее</th>' +
+            '</tr><tr>' +
+            '<td>' + s.count + '</td><td>' + s.min + '</td>' +
+            '<td>' + s.max + '</td><td>' + s.avg + '</td>' +
             '</tr></table>';
 
-        html += '<h3>Таблица измерений</h3>';
-        html += Graphs.tableHtml(meta).replace('class="gr-table"', 'class="gr-sheet-table"');
+        body += '<h3>Таблица измерений</h3>';
+        body += Graphs.tableHtml(meta).replace('class="gr-table"', 'class="grid"');
 
-        html += '<div class="gr-sheet-foot">Документ сформирован ' +
-            new Date().toLocaleString('ru-RU') +
-            '. Носит справочный характер и не является медицинским заключением.</div>';
+        Diary.printDocument('График — ' + p.name + ' — ' + period, body);
 
-        sheet.innerHTML = html;
-        return sheet;
+        meta.pdfInfo = {
+            filename: Graphs.fileName(meta),
+            savedAt: new Date().toISOString(),
+            status: 'printed'
+        };
+        Graphs.save(meta);
+    },
+
+    /* Имя документа для истории графиков */
+    fileName: function (meta) {
+        var start = UI.formatDate(meta.startDate);
+        var end = UI.formatDate(meta.endDate);
+        var range = (start === end) ? start : (start + ' - ' + end);
+        return 'Дневник график ' + range + '.pdf';
     },
 
     /* ======================================================================

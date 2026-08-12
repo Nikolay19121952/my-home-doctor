@@ -349,12 +349,12 @@
     <!-- Тост-уведомление -->
     <div id="toast" class="toast" style="display: none;"></div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
+    <!-- Все документы печатаются средствами браузера, поэтому html2canvas,
+         jsPDF и html2pdf больше не нужны: с версии 3.3 они убраны. Это
+         минус полмегабайта загрузки и минус одна ссылка на интернет. -->
     <!-- Библиотеки графиков и PDF лежат в самом приложении, а не на внешнем
          сервере: иначе раздел «Графики» не открылся бы без интернета. -->
     <script src="vendor/chart.umd.js"></script>
-    <script src="vendor/html2canvas.min.js"></script>
-    <script src="vendor/jspdf.umd.min.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/norms.js"></script>

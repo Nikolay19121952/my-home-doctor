@@ -113,8 +113,16 @@ var Profiles = {
             var age = UI.calculateAge(p.birthDate);
             var ageText = age !== null ? ', ' + UI.pluralAge(age) : '';
             var avatar = p.gender === 'female' ? '👩' : '👨';
-            var info = p.chronicConditions ? UI.escapeHtml(p.chronicConditions) : '';
-            if (info.length > 60) info = info.substring(0, 60) + '...';
+            // Показываем оба списка: отмеченные диагнозы и текст уточнений.
+            // Раньше выводился только свободный текст, и выбранные галочками
+            // диагнозы в списке семьи не были видны совсем.
+            var picked = Profiles.diagnosisTitles(p);
+            var extra = p.chronicConditions || '';
+            var info = '';
+            if (picked) info = UI.escapeHtml(picked);
+            if (extra) {
+                info += (info ? '<br>+ ' : '') + UI.escapeHtml(extra);
+            }
 
             var isActive = p.id === activeId;
             html += '<div class="profile-card' + (isActive ? ' profile-card-active' : '') +

@@ -322,10 +322,14 @@ var Diary = {
                 if (Diary.dayLevel(records[pageDays[f]])) { hasFlags = true; break; }
             }
             if (hasFlags) {
-                html += '<p class="dv-legend">Под датой перечислены показатели, вышедшие ' +
-                    'за границы нормы: <span class="dv-val dv-val-warn">🟡 жёлтым</span> — ' +
-                    'отклонение от 5 до 20%, <span class="dv-val dv-val-danger">🔴 красным</span> — ' +
-                    'больше 20%. Показатели в норме не перечисляются.</p>' +
+                html += '<p class="dv-legend">Под датой — итог за день по каждому ' +
+                    'показателю: сколько измерений в норме и насколько худшее из них ' +
+                    'вышло за границу. <span class="dv-val dv-val-warn">🟡 жёлтым</span> — ' +
+                    'отклонение в пределах одного шага (давление 15 и 10, пульс 15, ' +
+                    'сатурация 3, сахар 1,5, температура 0,5), ' +
+                    '<span class="dv-val dv-val-danger">🔴 красным</span> — дальше шага. ' +
+                    'Строка со знаком ⚠️ означает, что при вводе сработало ' +
+                    'предупреждение.</p>' +
                     Diary.normNote();
             }
 
@@ -361,41 +365,50 @@ var Diary = {
         var count = Diary.filledCount(rec.measurements);
         var checked = Diary._selectedDays.indexOf(rec.date) !== -1;
 
-        // Перечень отклонений от индивидуальных норм (ТЗ v3.1 часть 2, раздел 5)
-        var devs = Diary.deviations(rec);
-        var counts = { danger: 0, warn: 0 };
-        for (var k = 0; k < devs.length; k++) {
-            if (devs[k].level === 'danger') counts.danger++; else counts.warn++;
-        }
-        var level = counts.danger ? 'danger' : (counts.warn ? 'warn' : '');
+        // Уровень 2: сводка за день вместо перечня каждого измерения
+        var summary = Diary.daySummary(rec);
+        var alarms = Diary.dayAlarms(rec);
+        var level = Diary.dayLevel(rec);
 
         // Счётчики у даты: сколько красных и сколько жёлтых
         var flag = '';
-        if (level) {
-            flag = ' <span class="dv-flag dv-flag-danger">🔴 ' + counts.danger + '</span>' +
-                ' <span class="dv-flag dv-flag-warn">🟡 ' + counts.warn + '</span>';
+        if (summary.danger || summary.warn) {
+            flag = ' <span class="dv-flag dv-flag-danger">🔴 ' + summary.danger + '</span>' +
+                ' <span class="dv-flag dv-flag-warn">🟡 ' + summary.warn + '</span>';
         }
 
-        // Строки отклонений. Длинный список подрезаем, чтобы карточка дня
-        // не разрасталась на весь экран
+        // Если за день ничего не вышло за границы, карточка остаётся чистой:
+        // перечислять все показатели «в норме» незачем
         var devHtml = '';
-        if (devs.length) {
-            var shown = devs.slice(0, 6);
+        if (alarms.length || summary.params.length) {
             devHtml = '<div class="dv-devs">';
-            for (var n = 0; n < shown.length; n++) {
-                var dv = shown[n];
-                var sign = dv.percent > 0 ? '+' : '';
-                devHtml += '<div class="dv-dev dv-dev-' + dv.level + '">' +
-                    '<span class="dv-dev-time">' + UI.escapeHtml(dv.time) + '</span> ' +
-                    UI.escapeHtml(dv.label) + ': <strong>' + UI.escapeHtml(String(dv.value)) + '</strong>' +
-                    ' <span class="dv-dev-norm">(норма ' + dv.range[0] + '–' + dv.range[1] + ')</span>' +
-                    ' <span class="dv-dev-pct">' + sign + dv.percent + '%</span>' +
-                    '</div>';
+
+            // Уровень 1: сработавшие тревоги идут первыми и отдельно
+            var shownAlarms = alarms.slice(0, 3);
+            for (var a = 0; a < shownAlarms.length; a++) {
+                devHtml += '<div class="dv-dev dv-dev-alarm">⚠️ ' +
+                    '<span class="dv-dev-time">' + UI.escapeHtml(shownAlarms[a].time) + '</span> ' +
+                    UI.escapeHtml(shownAlarms[a].label) + ': <strong>' +
+                    Norms.num(shownAlarms[a].value) + '</strong> — было предупреждение</div>';
             }
-            if (devs.length > shown.length) {
-                devHtml += '<div class="dv-dev-more">и ещё ' + (devs.length - shown.length) +
-                    Diary.plural(devs.length - shown.length, ' отклонение', ' отклонения', ' отклонений') +
-                    ' — откройте запись</div>';
+            if (alarms.length > shownAlarms.length) {
+                devHtml += '<div class="dv-dev dv-dev-alarm">⚠️ и ещё ' +
+                    (alarms.length - shownAlarms.length) +
+                    Diary.plural(alarms.length - shownAlarms.length,
+                        ' предупреждение', ' предупреждения', ' предупреждений') +
+                    ' за день</div>';
+            }
+
+            for (var s = 0; s < summary.params.length; s++) {
+                var st = summary.params[s];
+                devHtml += '<div class="dv-dev dv-dev-' + st.level + '">' +
+                    '<strong>' + UI.escapeHtml(st.label) + ':</strong> ' +
+                    UI.escapeHtml(Diary.summaryLine(st)) + '</div>';
+            }
+
+            if (summary.normal.length) {
+                devHtml += '<div class="dv-dev-more">В норме: ' +
+                    UI.escapeHtml(summary.normal.join(', ')) + '</div>';
             }
             devHtml += '</div>';
         }
@@ -997,6 +1010,10 @@ var Diary = {
                 Diary.showCellError(alert17, true);
             }
         }
+
+        // Уровень 1: тревога по абсолютным порогам. Не зависит от таблицы
+        // норм и показывается сразу — это сигнал к действию, а не оценка.
+        Diary.checkAlarm(m, field, num, input);
 
         // Валидация №12: лимит 36 измерений
         if (Diary.filledCount(rec.measurements) >= Diary.MAX_ROWS) {
@@ -1698,29 +1715,45 @@ var Diary = {
         return lvl ? '<span class="dv-val dv-val-' + lvl + '">' + safe + '</span>' : safe;
     },
 
-    /* ----------------------------------------------------------------------
-     * Перечень отклонений за день: время, показатель, значение, норма,
-     * процент. Значения в пределах нормы в перечень не попадают.
-     * Красные идут перед жёлтыми (раздел 5 ТЗ).
-     * -------------------------------------------------------------------- */
-    deviations: function (rec) {
-        var out = [];
+    /* ======================================================================
+     * УРОВЕНЬ 2 — СВОДКА ЗА ДЕНЬ (ТЗ часть 4)
+     *
+     * Раньше карточка дня перечисляла каждое отклонившееся измерение
+     * отдельной строкой. При восьми измерениях в день это давало десяток
+     * строк вида «19:18 АД низ: 79 (норма 90–110) −12,2%», по которым
+     * невозможно принять решение: давление за день гуляет на 20–30 единиц,
+     * и отдельное значение само по себе ни о чём не говорит.
+     *
+     * Теперь по каждому показателю считается итог за день: сколько
+     * измерений в норме, сколько выше и сколько ниже границы, с худшим
+     * значением и расстоянием до границы в единицах показателя.
+     * ==================================================================== */
+    daySummary: function (rec) {
+        var out = {
+            total: 0, params: [], normal: [],
+            danger: 0, warn: 0, article: null
+        };
         if (!rec || !rec.measurements) return out;
 
         var article = Diary.article();
-        if (!article) return out;   // без даты рождения норму не подобрать
+        out.article = article;
 
         var profile = Storage.getActiveProfile();
         var height = profile ? profile.height : null;
 
         var rows = Diary.validRows(rec.measurements);
-        rows.sort(function (a, b) { return a.time < b.time ? -1 : 1; });
+        out.total = rows.length;
+        if (!article || rows.length === 0) return out;
 
-        for (var i = 0; i < rows.length; i++) {
-            var m = rows[i];
+        for (var j = 0; j < Diary.DEV_FIELDS.length; j++) {
+            var f = Diary.DEV_FIELDS[j];
+            var stat = {
+                key: f.norm, label: f.label, count: 0, inNorm: 0,
+                above: null, below: null, level: '', range: null
+            };
 
-            for (var j = 0; j < Diary.DEV_FIELDS.length; j++) {
-                var f = Diary.DEV_FIELDS[j];
+            for (var i = 0; i < rows.length; i++) {
+                var m = rows[i];
 
                 // ИМТ не хранится, а считается по весу и росту из карточки
                 var value = (f.from === '_bmi')
@@ -1728,44 +1761,137 @@ var Diary = {
                     : m[f.from];
 
                 var res = Norms.check(article, f.norm, value);
-                if (!res || !res.level) continue;
+                if (!res) continue;
 
-                out.push({
-                    time: m.time,
-                    label: f.label,
-                    value: value,
-                    bound: res.bound,
-                    range: res.range,
-                    percent: res.percent,
-                    level: res.level
-                });
+                stat.count++;
+                stat.range = res.range;
+
+                if (!res.level) {
+                    stat.inNorm++;
+                    continue;
+                }
+
+                var side = (res.direction === 'above') ? 'above' : 'below';
+                var worse = !stat[side] || res.distance > stat[side].distance;
+                if (worse) {
+                    stat[side] = {
+                        n: (stat[side] ? stat[side].n : 0) + 1,
+                        value: value, distance: res.distance,
+                        bound: res.bound, level: res.level, time: m.time
+                    };
+                } else {
+                    stat[side].n++;
+                }
+                if (res.level === 'danger') {
+                    stat.level = 'danger';
+                    out.danger++;
+                } else {
+                    if (stat.level !== 'danger') stat.level = 'warn';
+                    out.warn++;
+                }
+            }
+
+            if (stat.count === 0) continue;
+            if (stat.level) {
+                out.params.push(stat);
+            } else {
+                out.normal.push(stat.label);
             }
         }
 
-        // Сначала красные, внутри группы — по времени
-        out.sort(function (a, b) {
+        // Показатели с красными отметками — первыми
+        out.params.sort(function (a, b) {
             if (a.level !== b.level) return a.level === 'danger' ? -1 : 1;
-            return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0);
+            return 0;
         });
         return out;
     },
 
-    /* Сколько красных и жёлтых отклонений за день */
-    dayCounts: function (rec) {
-        var devs = Diary.deviations(rec);
-        var danger = 0, warn = 0;
-        for (var i = 0; i < devs.length; i++) {
-            if (devs[i].level === 'danger') danger++; else warn++;
+    /* Текст одной строки сводки: «выше 1 из 8 — 145, на 15 выше границы 130» */
+    summaryLine: function (stat) {
+        var parts = [];
+        parts.push('норма ' + stat.inNorm + ' из ' + stat.count);
+
+        if (stat.above) {
+            parts.push('выше ' + stat.above.n + ' — до ' + Norms.num(stat.above.value) +
+                ', на ' + Norms.num(stat.above.distance) +
+                ' выше границы ' + Norms.num(stat.above.bound));
         }
-        return { danger: danger, warn: warn, total: devs.length };
+        if (stat.below) {
+            parts.push('ниже ' + stat.below.n + ' — до ' + Norms.num(stat.below.value) +
+                ', на ' + Norms.num(stat.below.distance) +
+                ' ниже границы ' + Norms.num(stat.below.bound));
+        }
+        return parts.join(' · ');
     },
 
-    /* Худший уровень за весь день */
+    /* Сколько красных и жёлтых отклонений за день */
+    dayCounts: function (rec) {
+        var s = Diary.daySummary(rec);
+        return { danger: s.danger, warn: s.warn, total: s.danger + s.warn };
+    },
+
+    /* Худший уровень за весь день. Сработавшая тревога всегда красная. */
     dayLevel: function (rec) {
+        if (Diary.dayAlarms(rec).length > 0) return 'danger';
         var c = Diary.dayCounts(rec);
         if (c.danger > 0) return 'danger';
         if (c.warn > 0) return 'warn';
         return '';
+    },
+
+    /* ======================================================================
+     * УРОВЕНЬ 1 — ТРЕВОГА ПРИ ВВОДЕ (ТЗ часть 4)
+     *
+     * Пороги абсолютные и одинаковые для всех, таблица норм здесь ни при
+     * чём. Смысл в том, чтобы сигнал был редким и всегда по делу: если
+     * человек один раз увидит тревогу на нормальном значении, он перестанет
+     * обращать на неё внимание вообще.
+     *
+     * Факт срабатывания сохраняется в самом измерении (поле alarms), чтобы
+     * врач потом видел: тревога была, а не просто «показатель высокий».
+     * ==================================================================== */
+    checkAlarm: function (m, field, value, input) {
+        var alarm = Norms.alarmFor(field, value);
+
+        if (!m.alarms) m.alarms = [];
+        var pos = m.alarms.indexOf(field);
+
+        if (!alarm) {
+            if (pos !== -1) m.alarms.splice(pos, 1);
+            if (input) input.classList.remove('dv-cell-alarm');
+            return;
+        }
+
+        if (pos === -1) m.alarms.push(field);
+        if (input) input.classList.add('dv-cell-alarm');
+
+        UI.showAlert(
+            '⚠️ Обратите внимание прямо сейчас!',
+            alarm.label + ': ' + Norms.num(alarm.value) + '. ' + alarm.text,
+            'Понятно'
+        );
+    },
+
+    /* Тревоги за день: по одной строке на сработавший показатель */
+    dayAlarms: function (rec) {
+        var out = [];
+        if (!rec || !rec.measurements) return out;
+
+        var rows = Diary.validRows(rec.measurements);
+        rows.sort(function (a, b) { return a.time < b.time ? -1 : 1; });
+
+        for (var i = 0; i < rows.length; i++) {
+            var list = Norms.alarmsForRow(rows[i]);
+            for (var j = 0; j < list.length; j++) {
+                out.push({
+                    time: rows[i].time,
+                    label: list[j].label,
+                    value: list[j].value
+                });
+            }
+        }
+        return out;
     },
 
     /* ----------------------------------------------------------------------

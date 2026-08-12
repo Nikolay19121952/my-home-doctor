@@ -368,15 +368,116 @@ var Norms = {
     },
 
     /* ======================================================================
-     * ОТКЛОНЕНИЕ ОТ НОРМЫ (раздел 5 ТЗ)
+     * УРОВЕНЬ 1 — ТРЕВОГА ПРИ ВВОДЕ (ТЗ часть 4)
      *
-     * Норма задана диапазоном, поэтому отклонение считается от ближайшей
-     * границы: значение внутри диапазона отклонением не считается.
-     * Проверка на примере: 125 при диапазоне 140–180 → (125 − 140) / 140,
-     * то есть −10.7% и жёлтая отметка.
+     * Это не «норма» и не диагноз, а значения, при которых стоит что-то
+     * предпринять. Пороги одинаковы для всех и НЕ зависят от таблицы норм:
+     * они должны срабатывать редко и всегда по делу, поэтому их нельзя
+     * привязывать к спорным индивидуальным границам.
      * ==================================================================== */
-    WARN_PERCENT: 5,
-    DANGER_PERCENT: 20,
+    ALARMS: [
+        {
+            field: 'ad_top', label: 'Давление верхнее', above: 180,
+            text: 'Очень высокое давление. Отдохните 15 минут и измерьте повторно. ' +
+                'Если значение держится — свяжитесь с врачом'
+        },
+        {
+            field: 'ad_top', label: 'Давление верхнее', below: 85,
+            text: 'Очень низкое давление. Присядьте или прилягте и измерьте повторно'
+        },
+        {
+            field: 'ad_bottom', label: 'Давление нижнее', above: 120,
+            text: 'Очень высокое нижнее давление. Обратитесь к врачу'
+        },
+        {
+            field: 'ad_bottom', label: 'Давление нижнее', below: 55,
+            text: 'Очень низкое нижнее давление. Присядьте и измерьте повторно'
+        },
+        {
+            field: 'pulse', label: 'Пульс', above: 120,
+            text: 'Очень частый пульс. Отдохните 10 минут и измерьте повторно'
+        },
+        {
+            field: 'pulse', label: 'Пульс', below: 45,
+            text: 'Очень редкий пульс. При слабости или головокружении обратитесь к врачу'
+        },
+        {
+            field: 'spo2', label: 'Сатурация', below: 88,
+            text: 'Критически низкая сатурация! Требуется помощь — вызовите врача'
+        },
+        {
+            field: 'temperature', label: 'Температура', above: 38.5,
+            text: 'Высокая температура. Обильное питьё, при ухудшении — вызов врача'
+        },
+        {
+            field: 'temperature', label: 'Температура', below: 35.5,
+            text: 'Пониженная температура. Согрейтесь; при слабости обратитесь к врачу'
+        },
+        {
+            field: 'sugar', label: 'Сахар крови', above: 13.0,
+            text: 'Очень высокий сахар. Свяжитесь с врачом'
+        },
+        {
+            field: 'sugar', label: 'Сахар крови', below: 3.5,
+            text: 'Низкий сахар. Примите быстрые углеводы — сок, сахар, конфету'
+        }
+    ],
+
+    /* Тревога по одному значению; null — если порог не сработал.
+       Границы включительно: «≥180» и «≤85» из ТЗ. */
+    alarmFor: function (field, value) {
+        if (value === null || value === undefined || value === '') return null;
+        var v = Number(value);
+        if (isNaN(v)) return null;
+
+        for (var i = 0; i < Norms.ALARMS.length; i++) {
+            var a = Norms.ALARMS[i];
+            if (a.field !== field) continue;
+            if (a.above !== undefined && v >= a.above) {
+                return { field: field, label: a.label, value: v, text: a.text };
+            }
+            if (a.below !== undefined && v <= a.below) {
+                return { field: field, label: a.label, value: v, text: a.text };
+            }
+        }
+        return null;
+    },
+
+    /* Все тревоги одного измерения */
+    alarmsForRow: function (m) {
+        var out = [];
+        if (!m) return out;
+        var fields = ['ad_top', 'ad_bottom', 'pulse', 'spo2', 'temperature', 'sugar'];
+        for (var i = 0; i < fields.length; i++) {
+            var a = Norms.alarmFor(fields[i], m[fields[i]]);
+            if (a) out.push(a);
+        }
+        return out;
+    },
+
+    /* ======================================================================
+     * ОТКЛОНЕНИЕ ОТ НОРМЫ — «шаг тревоги» (ТЗ часть 4, уровень 2)
+     *
+     * Раньше отклонение считалось в процентах от границы. Для давления,
+     * пульса и сахара это работало, а для сатурации и температуры — нет:
+     * сатурация 88% при границе 95 давала всего −7,4%, то есть жёлтую
+     * отметку, хотя это уже повод для тревоги; красную по проценту нельзя
+     * было получить в принципе.
+     *
+     * Теперь у каждого показателя свой «шаг тревоги» в его собственных
+     * единицах. Отклонение в пределах шага — жёлтая отметка, дальше —
+     * красная. Тексты тоже стали понятнее: вместо «−12,2%» приложение
+     * говорит «на 11 ниже границы 90».
+     * ==================================================================== */
+    STEP: {
+        ad_top: 15,      // мм рт. ст.
+        ad_bottom: 10,   // мм рт. ст.
+        pulse: 15,       // уд./мин
+        spo2: 3,         // %
+        sugar: 1.5,      // ммоль/л
+        temp: 0.5,       // °C
+        bmi: 3.0
+    },
 
     check: function (article, field, value) {
         if (!article || value === null || value === undefined || value === '') return null;
@@ -388,27 +489,48 @@ var Norms = {
 
         var min = range[0];
         var max = range[1];
-        var bound;
+        var bound, direction;
 
         if (v < min) {
             bound = min;
+            direction = 'below';
         } else if (v > max) {
             bound = max;
+            direction = 'above';
         } else {
-            return { level: '', percent: 0, bound: null, range: range };
+            return {
+                level: '', direction: 'in', distance: 0,
+                bound: null, range: range, step: Norms.STEP[field] || null
+            };
         }
 
-        var percent = (v - bound) / bound * 100;
-        var abs = Math.abs(percent);
-        var level = abs > Norms.DANGER_PERCENT ? 'danger'
-            : (abs >= Norms.WARN_PERCENT ? 'warn' : '');
+        var step = Norms.STEP[field];
+        var distance = Math.round(Math.abs(v - bound) * 10) / 10;
+        var level = (!step || distance > step) ? 'danger' : 'warn';
 
         return {
             level: level,
-            percent: Math.round(percent * 10) / 10,
+            direction: direction,
+            distance: distance,
             bound: bound,
-            range: range
+            range: range,
+            step: step || null
         };
+    },
+
+    /* «на 11 ниже границы 90» — текст отклонения для карточки и документов */
+    describe: function (res) {
+        if (!res || !res.level) return '';
+        return 'на ' + Norms.num(res.distance) +
+            (res.direction === 'above' ? ' выше' : ' ниже') +
+            ' границы ' + Norms.num(res.bound);
+    },
+
+    /* Печатает 5 вместо 5.0, но 36.5 оставляет как есть */
+    num: function (v) {
+        var n = Number(v);
+        if (isNaN(n)) return String(v);
+        return (Math.round(n) === n) ? String(Math.round(n)) : String(n);
     },
 
     /* ======================================================================
