@@ -189,14 +189,42 @@ var Diary = {
      * ==================================================================== */
     render: function () {
         if (Diary.view === 'form') return Diary.renderForm();
-        if (Diary.view === 'chat') return Diary.renderChat();
         return Diary.renderList();
     },
 
+    /* Отдельной истории консультаций больше нет — переписка одна,
+       и живёт она в разделе «Доктор» (ТЗ v3.2, пункт 1) */
+    openDoctorChat: function () {
+        App.navigateTo('doctor');
+        Doctor.renderHistory();
+        Doctor.updateTitle();
+    },
+
+    /* ----------------------------------------------------------------------
+     * Позиция прокрутки списка (ТЗ v3.2, пункт 6).
+     *
+     * Раньше после выхода из записи список открывался с начала, и в длинном
+     * дневнике приходилось каждый раз искать нужный день заново. Теперь
+     * положение запоминается при открытии записи и возвращается при выходе.
+     * -------------------------------------------------------------------- */
+    _listScroll: 0,
+
     show: function (view) {
+        var back = (view === 'list' && Diary.view === 'form');
+        if (Diary.view === 'list' && view === 'form') {
+            Diary._listScroll = window.pageYOffset || 0;
+        }
+
         Diary.view = view;
         Diary.render();
-        window.scrollTo(0, 0);
+
+        if (back && Diary._listScroll > 0) {
+            var y = Diary._listScroll;
+            // Список рисуется синхронно, но браузеру нужен кадр на раскладку
+            setTimeout(function () { window.scrollTo(0, y); }, 0);
+        } else {
+            window.scrollTo(0, 0);
+        }
     },
 
     /* Точка входа из App.navigateTo('diary') */
@@ -270,7 +298,7 @@ var Diary = {
             Diary.panelBtn('2', '⬆️', 'Прокрутить вверх', 'Diary.scrollList(-1)') +
             Diary.panelBtn('3', '⬇️', 'Прокрутить вниз', 'Diary.scrollList(1)') +
             Diary.panelBtn('4', '📝', 'Запись измерений', 'Diary.openForm()', 'dv-btn-main') +
-            Diary.panelBtn('5', '💬', 'История чата', 'Diary.show(\'chat\')') +
+            Diary.panelBtn('5', '💬', 'Чат Доктора', 'Diary.openDoctorChat()') +
             Diary.panelBtn('6', '📈', 'Создать график', 'Graphs.start()') +
             Diary.panelBtn('7', '🖨️', 'Файл / Печать периода', 'Period.print()') +
             '</div>';
@@ -1308,81 +1336,26 @@ var Diary = {
         Diary.sendConsult([{ date: rec.date, measurements: rows }], [rec.date]);
     },
 
+    /* ----------------------------------------------------------------------
+     * ОТПРАВКА ДОКТОРУ (ТЗ v3.2, пункт 1)
+     *
+     * Раньше дневник вёл собственную переписку и сам ходил в API. Получалось
+     * две несвязанные истории: доктор не помнил, что обсуждалось в другой,
+     * а пользователь не знал, в какую смотреть. Теперь дневник только
+     * собирает текст запроса, а отправкой и хранением занимается общий чат
+     * раздела «Доктор».
+     * -------------------------------------------------------------------- */
     sendConsult: function (records, days) {
-        if (Diary._sending) {
-            UI.showToast('Запрос уже отправлен, подождите');
-            return;
-        }
-        if (!navigator.onLine) {
-            UI.showToast('Нет соединения с интернетом', 3500);
-            return;
-        }
-
         var dayLabels = days.map(function (d) { return Diary.formatDay(d); }).join(', ');
 
         UI.showConfirm(
             'Отправить доктору?',
-            'Данные за ' + dayLabels + ' будут отправлены ИИ-доктору для анализа.',
+            'Данные за ' + dayLabels + ' будут отправлены ИИ-доктору для анализа. ' +
+            'Вопрос и ответ появятся в чате раздела «Доктор».',
             'Отправить',
             function () {
-                Diary._sending = true;
-                UI.showToast('Отправляю запрос доктору...', 4000);
-
-                var prompt = Diary.buildPrompt(records);
-
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', '/api/chat', true);
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.timeout = 90000;   // запас на длинные заключения
-
-                xhr.onload = function () {
-                    Diary._sending = false;
-                    if (xhr.status === 200) {
-                        var data;
-                        try {
-                            data = JSON.parse(xhr.responseText);
-                        } catch (e) {
-                            UI.showToast('Ошибка обработки ответа сервера', 3500);
-                            return;
-                        }
-                        var reply = (data.reply || '').replace('[ПРОДОЛЖЕНИЕ]', '').trim();
-                        if (!reply) {
-                            UI.showToast('Доктор не прислал ответ, попробуйте ещё раз', 3500);
-                            return;
-                        }
-                        Diary.storeConsult(days, prompt, reply);
-                        Diary._selectedDays = [];
-                        UI.showToast('Ответ получен! Смотрите историю консультаций', 4000);
-                        Diary.show('chat');
-                    } else if (xhr.status === 403) {
-                        UI.showToast('Нужен код доступа к доктору — откройте раздел «Доктор»', 4000);
-                    } else if (xhr.status === 429) {
-                        UI.showToast('Слишком много запросов, подождите немного', 3500);
-                    } else if (xhr.status === 401) {
-                        UI.showToast('Ошибка авторизации API (проверьте ключ)', 3500);
-                    } else {
-                        UI.showToast('Ошибка сервера Claude (код ' + xhr.status + ')', 3500);
-                    }
-                };
-
-                xhr.ontimeout = function () {
-                    Diary._sending = false;
-                    UI.showToast('Сервер не ответил, попробуйте позже', 3500);
-                };
-
-                xhr.onerror = function () {
-                    Diary._sending = false;
-                    UI.showToast('Нет соединения с интернетом', 3500);
-                };
-
-                xhr.send(JSON.stringify({
-                    message: prompt,
-                    history: [],
-                    profileContext: Doctor.getProfileContext(),
-                    analysesContext: '',
-                    files: [],
-                    accessCode: localStorage.getItem('hd_access_code') || ''
-                }));
+                Diary._selectedDays = [];
+                Doctor.sendFromApp(Diary.buildPrompt(records));
             }
         );
     },
@@ -1417,135 +1390,47 @@ var Diary = {
         return lines.join('\n');
     },
 
-    storeConsult: function (days, prompt, reply) {
-        var chat = Diary.getChat();
-        chat.unshift({
-            id: 'msg_' + Date.now().toString(36),
-            timestamp: new Date().toISOString(),
-            selected_days: days.slice(),
-            user_message: 'Отправлен дневник за ' + days.map(function (d) {
-                return Diary.formatDay(d);
-            }).join(', '),
-            prompt: prompt,
-            ai_response: reply,
-            model: 'claude-haiku-4-5'
-        });
-        if (chat.length > 100) chat = chat.slice(0, 100);
-        Diary.saveChat(chat);
-    },
-
     /* ======================================================================
-     * МАКЕТ №4 — ИСТОРИЯ КОНСУЛЬТАЦИЙ
+     * ПЕРЕНОС СТАРЫХ КОНСУЛЬТАЦИЙ В ОБЩИЙ ЧАТ
+     *
+     * До версии 3.4 консультации по дневнику и графикам лежали отдельно
+     * (ключ mdd_diary_chat). Чтобы при объединении чатов ничего не пропало,
+     * они разово переносятся в историю доктора — по хронологии, в начало.
+     * Исходный список сохраняется в резервном ключе.
      * ==================================================================== */
-    renderChat: function () {
-        var host = document.getElementById('diary-root');
-        if (!host) return;
+    migrateChatToDoctor: function () {
+        var key = Diary.chatKey();
+        var raw = localStorage.getItem(key);
+        if (!raw) return;
 
-        var chat = Diary.getChat();
-        var html = '';
-
-        html += '<div class="dv-head">' +
-            '<button class="dv-back" onclick="Diary.show(\'list\')">← Назад</button>' +
-            '<h2 class="dv-title">💬 История консультаций</h2>' +
-            '</div>';
-
-        if (chat.length === 0) {
-            html += '<div class="empty-state">' +
-                '<div class="empty-icon">💬</div>' +
-                '<h3>Консультаций пока нет</h3>' +
-                '<p>Отметьте дни в списке записей и нажмите «Отправить доктору».</p>' +
-                '</div>';
-            host.innerHTML = html;
+        var chat;
+        try { chat = JSON.parse(raw); } catch (e) { chat = null; }
+        if (!chat || !chat.length) {
+            localStorage.removeItem(key);
             return;
         }
 
-        for (var i = 0; i < chat.length; i++) {
-            var c = chat[i];
-            var when = Diary.formatStamp(c.timestamp);
-            var daysText = (c.selected_days || []).map(function (d) {
-                return Diary.formatDay(d);
-            }).join(', ');
-
-            html += '<div class="dv-msg">';
-            html += '<div class="dv-msg-user">' +
-                '<div class="dv-msg-who">🧑 Вы · ' + UI.escapeHtml(when) + '</div>' +
-                '<div class="dv-msg-days">Отправлены дни: ' + UI.escapeHtml(daysText) + '</div>' +
-                '</div>';
-            html += '<div class="dv-msg-ai">' +
-                '<div class="dv-msg-who">🩺 Доктор</div>' +
-                '<div class="dv-msg-text">' + Diary.formatReply(c.ai_response) + '</div>' +
-                '</div>';
-            html += '<div class="dv-msg-actions">' +
-                '<button class="btn btn-outline btn-small" onclick="Diary.copyConsult(\'' + c.id + '\')">📋 Копировать</button>' +
-                // v2.2: одна кнопка вместо трёх — браузер сам предложит
-                // напечатать или сохранить в PDF
-                '<button class="btn btn-outline btn-small" title="Печать или сохранение в PDF"' +
-                ' onclick="Diary.printConsult(\'' + c.id + '\')">🖨️ Печать / 💾 Файл</button>' +
-                '<button class="dv-del" onclick="Diary.deleteConsult(\'' + c.id + '\')" title="Удалить">✕</button>' +
-                '</div>';
-            html += '</div>';
-        }
-
-        host.innerHTML = html;
-    },
-
-    findConsult: function (id) {
-        var chat = Diary.getChat();
-        for (var i = 0; i < chat.length; i++) {
-            if (chat[i].id === id) return chat[i];
-        }
-        return null;
-    },
-
-    copyConsult: function (id) {
-        var c = Diary.findConsult(id);
-        if (!c) return;
-        var text = c.ai_response;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function () {
-                UI.showToast('Скопировано в буфер обмена');
-            }).catch(function () {
-                Diary.fallbackCopy(text);
-            });
-        } else {
-            Diary.fallbackCopy(text);
-        }
-    },
-
-    fallbackCopy: function (text) {
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-            document.execCommand('copy');
-            UI.showToast('Скопировано в буфер обмена');
-        } catch (e) {
-            UI.showToast('Не удалось скопировать');
-        }
-        document.body.removeChild(ta);
-    },
-
-    printConsult: function (id) {
-        var c = Diary.findConsult(id);
-        if (!c) return;
-        var days = (c.selected_days || []).map(function (d) { return Diary.formatDay(d); }).join(', ');
-        var body = '<h2>Консультация ИИ-доктора</h2>' +
-            '<p><strong>Дата консультации:</strong> ' + UI.escapeHtml(Diary.formatStamp(c.timestamp)) + '</p>' +
-            '<p><strong>Данные за:</strong> ' + UI.escapeHtml(days) + '</p><hr>' +
-            Diary.formatReply(c.ai_response);
-        Diary.printDocument('Консультация — ' + days, body);
-    },
-
-    deleteConsult: function (id) {
-        UI.showConfirm('Удалить консультацию?', 'Запись из истории будет удалена.', 'Удалить', function () {
-            var chat = Diary.getChat().filter(function (c) { return c.id !== id; });
-            Diary.saveChat(chat);
-            UI.showToast('Консультация удалена');
-            Diary.renderChat();
+        // В списке новые записи стоят первыми — разворачиваем в хронологию
+        var ordered = chat.slice().sort(function (a, b) {
+            return (a.timestamp || '') < (b.timestamp || '') ? -1 : 1;
         });
+
+        var moved = [];
+        for (var i = 0; i < ordered.length; i++) {
+            var c = ordered[i];
+            if (!c.ai_response) continue;
+            moved.push({ role: 'user', content: c.prompt || c.user_message || 'Данные дневника' });
+            moved.push({ role: 'assistant', content: c.ai_response });
+        }
+
+        if (moved.length) {
+            var history = moved.concat(Doctor.getHistory());
+            if (history.length > 40) history = history.slice(history.length - 40);
+            Doctor.saveHistory(history);
+        }
+
+        localStorage.setItem(key + '_backup', raw);
+        localStorage.removeItem(key);
     },
 
     /* ======================================================================
@@ -1741,7 +1626,12 @@ var Diary = {
         var profile = Storage.getActiveProfile();
         var height = profile ? profile.height : null;
 
+        // Порядок тот же, что в самой записи: по времени, начиная с первого.
+        // Номер измерения нужен, чтобы в сводке можно было сослаться
+        // на конкретную строку записи (ТЗ v3.2, пункт 4).
         var rows = Diary.validRows(rec.measurements);
+        rows.sort(function (a, b) { return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0); });
+
         out.total = rows.length;
         if (!article || rows.length === 0) return out;
 
@@ -1777,7 +1667,8 @@ var Diary = {
                     stat[side] = {
                         n: (stat[side] ? stat[side].n : 0) + 1,
                         value: value, distance: res.distance,
-                        bound: res.bound, level: res.level, time: m.time
+                        bound: res.bound, level: res.level,
+                        time: m.time, num: i + 1
                     };
                 } else {
                     stat[side].n++;
@@ -1807,22 +1698,29 @@ var Diary = {
         return out;
     },
 
-    /* Текст одной строки сводки: «выше 1 из 8 — 145, на 15 выше границы 130» */
+    /* ----------------------------------------------------------------------
+     * Текст строки сводки (ТЗ v3.2, пункт 4).
+     *
+     * Прежняя запись «ниже 3 — до 85» читалась двояко: тройка означала
+     * количество измерений, а выглядела как номер измерения. Теперь
+     * количество и номер разведены: «ниже границы 120 — 3 изм.
+     * (худшее №1: 85, на 35 ниже)». Номер тот же, что в самой записи.
+     * -------------------------------------------------------------------- */
     summaryLine: function (stat) {
-        var parts = [];
-        parts.push('норма ' + stat.inNorm + ' из ' + stat.count);
+        var parts = ['в норме ' + stat.inNorm + ' из ' + stat.count];
 
-        if (stat.above) {
-            parts.push('выше ' + stat.above.n + ' — до ' + Norms.num(stat.above.value) +
-                ', на ' + Norms.num(stat.above.distance) +
-                ' выше границы ' + Norms.num(stat.above.bound));
-        }
-        if (stat.below) {
-            parts.push('ниже ' + stat.below.n + ' — до ' + Norms.num(stat.below.value) +
-                ', на ' + Norms.num(stat.below.distance) +
-                ' ниже границы ' + Norms.num(stat.below.bound));
-        }
+        if (stat.above) parts.push(Diary.summarySide(stat.above, 'выше'));
+        if (stat.below) parts.push(Diary.summarySide(stat.below, 'ниже'));
+
         return parts.join(' · ');
+    },
+
+    summarySide: function (side, word) {
+        return word + ' границы ' + Norms.num(side.bound) + ' — ' +
+            side.n + ' изм. (' +
+            (side.n > 1 ? 'худшее ' : '') + '№' + side.num + ': ' +
+            Norms.num(side.value) + ', на ' + Norms.num(side.distance) +
+            ' ' + word + ')';
     },
 
     /* Сколько красных и жёлтых отклонений за день */

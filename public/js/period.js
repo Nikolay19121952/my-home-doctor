@@ -261,8 +261,8 @@ var Period = {
         if (s.article) {
             html += '<p style="font-size:12px;color:#555">Норма подобрана по карточке ' +
                 'профиля: <strong>' + UI.escapeHtml(s.article.title) + '</strong>. ' +
-                'Вне нормы считаются значения, отклонившиеся от границы диапазона ' +
-                'на 5% и больше.<br>⚠️ ' + UI.escapeHtml(Norms.COMMON_NOTE) + '</p>';
+                'Вне нормы считаются значения, вышедшие за границы диапазона.' +
+                '<br>⚠️ ' + UI.escapeHtml(Norms.COMMON_NOTE) + '</p>';
         } else {
             html += '<p style="font-size:12px;color:#555">Норма не подобрана: ' +
                 'в карточке профиля не заполнены дата рождения, рост или диагнозы.</p>';

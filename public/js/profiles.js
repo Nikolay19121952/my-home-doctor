@@ -59,6 +59,10 @@ var Profiles = {
         Diary._current = null;
         Diary._editingDay = null;
         Diary._selectedDays = [];
+        Diary._listScroll = 0;
+
+        // Доктор должен заново уточнить, кого консультирует
+        Doctor._subject = null;
         Diary._dirty = false;
         Diary.view = 'list';
         if (typeof Graphs !== 'undefined' && Graphs._chart) {

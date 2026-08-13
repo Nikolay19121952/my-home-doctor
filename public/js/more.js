@@ -812,14 +812,14 @@ var More = {
         html += '<div class="about-section">' +
             '<div class="about-logo">🩺</div>' +
             '<h3>Мой домашний доктор</h3>' +
-            '<p class="about-version">Версия 3.3 · август 2026</p>' +
+            '<p class="about-version">Версия 3.4 · август 2026</p>' +
             '</div>';
 
         // ТЕКУЩАЯ ВЕРСИЯ
         html += '<div class="about-card">' +
             '<h3>📌 Текущая версия</h3>' +
             '<ul class="about-facts">' +
-            '<li><strong>Версия:</strong> 3.3</li>' +
+            '<li><strong>Версия:</strong> 3.4</li>' +
             '<li><strong>Дата выпуска:</strong> август 2026</li>' +
             '<li><strong>Статус:</strong> работает в production</li>' +
             '<li><strong>Показатели дневника:</strong> 7 — давление верхнее и нижнее, ' +
@@ -991,7 +991,7 @@ var More = {
             '<div class="about-release">' +
             '<div class="about-release-head"><span class="about-release-ver">v3.3</span>' +
             '<span class="about-release-date">август 2026</span>' +
-            '<span class="about-release-status about-done">текущая</span></div>' +
+            '<span class="about-release-status about-done">запущено</span></div>' +
             '<ul><li>Трёхуровневый контроль показателей</li>' +
             '<li>Уровень 1 — тревога сразу при вводе: 11 порогов, одинаковых ' +
             'для всех и не зависящих от таблицы норм</li>' +
@@ -1006,6 +1006,22 @@ var More = {
             'страницами</li>' +
             '<li>Приложение стало легче на полмегабайта: три библиотеки ' +
             'печати больше не нужны</li></ul></div>' +
+
+            '<div class="about-release">' +
+            '<div class="about-release-head"><span class="about-release-ver">v3.4</span>' +
+            '<span class="about-release-date">август 2026</span>' +
+            '<span class="about-release-status about-done">текущая</span></div>' +
+            '<ul><li>Один чат вместо двух: дневник и графики отправляются ' +
+            'в общую переписку раздела «Доктор», отдельная история ' +
+            'консультаций убрана, прежние консультации перенесены</li>' +
+            '<li>Если в семье несколько человек, приложение спрашивает, ' +
+            'кого консультируем, и переключает переписку</li>' +
+            '<li>Новый диагноз: гипотензия (хроническое низкое давление)</li>' +
+            '<li>В сводке за день количество измерений и номер измерения ' +
+            'больше не путаются</li>' +
+            '<li>В документе с графиком появилась статистика за период</li>' +
+            '<li>После выхода из записи список открывается на том же ' +
+            'месте</li></ul></div>' +
 
             '</div></div>';
 
@@ -1031,7 +1047,7 @@ var More = {
         html += '<div class="about-card">' +
             '<h3>🗺️ План развития</h3>' +
             '<ul class="about-facts">' +
-            '<li><strong>v3.3</strong> — август 2026, текущая версия</li>' +
+            '<li><strong>v3.4</strong> — август 2026, текущая версия</li>' +
             '<li><strong>v4.0</strong> — облачная синхронизация без ручного переноса файлов, ' +
             'интерактивные графики и сравнение нескольких показателей</li>' +
             '<li><strong>v4.1</strong> — мобильное приложение или расширение возможностей</li>' +

@@ -493,18 +493,13 @@ var Graphs = {
     },
 
     /* ======================================================================
-     * ОТПРАВКА ГРАФИКА ДОКТОРУ (доработка №5)
+     * ОТПРАВКА ГРАФИКА ДОКТОРУ
+     *
+     * С версии 3.4 чат один: график уходит обычным сообщением в переписку
+     * раздела «Доктор», а не в отдельную историю консультаций.
      * ==================================================================== */
     sendToDoctor: function () {
         if (!Graphs._meta) return;
-        if (Graphs._sending) {
-            UI.showToast('Запрос уже отправлен, подождите');
-            return;
-        }
-        if (!navigator.onLine) {
-            UI.showToast('Нет соединения с интернетом', 3500);
-            return;
-        }
 
         var meta = Graphs._meta;
         var period = UI.formatDate(meta.startDate);
@@ -513,67 +508,13 @@ var Graphs = {
         UI.showConfirm(
             'Отправить доктору?',
             'График «' + Graphs.param(meta.parameter).name + '» за ' + period +
-            ' будет отправлен ИИ-доктору для анализа.',
+            ' будет отправлен ИИ-доктору для анализа. Вопрос и ответ появятся ' +
+            'в чате раздела «Доктор».',
             'Отправить',
             function () {
-                Graphs._sending = true;
-                UI.showToast('Отправляю запрос доктору...', 4000);
-
-                var prompt = Graphs.buildPrompt(meta);
-
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', '/api/chat', true);
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.timeout = 90000;
-
-                xhr.onload = function () {
-                    Graphs._sending = false;
-                    if (xhr.status === 200) {
-                        var data;
-                        try {
-                            data = JSON.parse(xhr.responseText);
-                        } catch (e) {
-                            UI.showToast('Ошибка обработки ответа сервера', 3500);
-                            return;
-                        }
-                        var reply = (data.reply || '').replace('[ПРОДОЛЖЕНИЕ]', '').trim();
-                        if (!reply) {
-                            UI.showToast('Доктор не прислал ответ, попробуйте ещё раз', 3500);
-                            return;
-                        }
-                        Graphs.storeConsult(meta, prompt, reply);
-                        UI.showToast('Консультация получена! Смотрите историю чата', 4000);
-                        App.navigateTo('diary');
-                        Diary.show('chat');
-                    } else if (xhr.status === 403) {
-                        UI.showToast('Нужен код доступа к доктору — откройте раздел «Доктор»', 4000);
-                    } else if (xhr.status === 429) {
-                        UI.showToast('Слишком много запросов, подождите немного', 3500);
-                    } else if (xhr.status === 401) {
-                        UI.showToast('Ошибка авторизации API (проверьте ключ)', 3500);
-                    } else {
-                        UI.showToast('Ошибка сервера Claude (код ' + xhr.status + ')', 3500);
-                    }
-                };
-
-                xhr.ontimeout = function () {
-                    Graphs._sending = false;
-                    UI.showToast('Сервер не ответил, попробуйте позже', 3500);
-                };
-
-                xhr.onerror = function () {
-                    Graphs._sending = false;
-                    UI.showToast('Нет соединения с интернетом', 3500);
-                };
-
-                xhr.send(JSON.stringify({
-                    message: prompt,
-                    history: [],
-                    profileContext: Doctor.getProfileContext(),
-                    analysesContext: '',
-                    files: [],
-                    accessCode: localStorage.getItem('hd_access_code') || ''
-                }));
+                meta.consultedAt = new Date().toISOString();
+                Graphs.save(meta);
+                Doctor.sendFromApp(Graphs.buildPrompt(meta));
             }
         );
     },
@@ -607,32 +548,6 @@ var Graphs = {
         lines.push('Проанализируйте эти данные, обратите внимание на тренды и колебания. ' +
             'Дайте профессиональную рекомендацию.');
         return lines.join('\n');
-    },
-
-    /* Консультация ложится в ту же историю чата, что и запросы из дневника */
-    storeConsult: function (meta, prompt, reply) {
-        var p = Graphs.param(meta.parameter);
-        var period = UI.formatDate(meta.startDate);
-        if (meta.startDate !== meta.endDate) period += ' — ' + UI.formatDate(meta.endDate);
-
-        var chat = Diary.getChat();
-        chat.unshift({
-            id: 'msg_' + Date.now().toString(36),
-            timestamp: new Date().toISOString(),
-            type: 'graph_consultation',
-            graphId: meta.id,
-            parameter: meta.parameter,
-            selected_days: meta.selectedDays.slice(),
-            user_message: 'Отправлен график «' + p.name + '» за ' + period,
-            prompt: prompt,
-            ai_response: reply,
-            model: 'claude-haiku-4-5'
-        });
-        if (chat.length > 100) chat = chat.slice(0, 100);
-        Diary.saveChat(chat);
-
-        meta.consultedAt = new Date().toISOString();
-        Graphs.save(meta);
     },
 
     /* ======================================================================
@@ -679,6 +594,20 @@ var Graphs = {
 
         body += '<h3>Таблица измерений</h3>';
         body += Graphs.tableHtml(meta).replace('class="gr-table"', 'class="grid"');
+
+        // Статистика за тот же период по всем показателям (ТЗ v3.2, пункт 5).
+        // Считается тем же кодом, что и в дневнике за период, чтобы цифры
+        // в двух документах не расходились.
+        var records = Diary.getRecords();
+        var list = [];
+        for (var i = 0; i < meta.selectedDays.length; i++) {
+            var rec = records[meta.selectedDays[i]];
+            if (rec && Diary.validRows(rec.measurements).length > 0) list.push(rec);
+        }
+        if (list.length > 0) {
+            list.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+            body += Period.statsHtml(list);
+        }
 
         Diary.printDocument('График — ' + p.name + ' — ' + period, body);
 

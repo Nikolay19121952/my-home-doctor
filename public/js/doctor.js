@@ -256,14 +256,40 @@ var Doctor = {
         return lines.join('\n');
     },
 
-    sendMessage: function () {
+    /* ----------------------------------------------------------------------
+     * Отправка из дневника и со страницы графика (ТЗ v3.2, пункт 1).
+     *
+     * Раньше эти кнопки вели собственную переписку в разделе «Дневник»,
+     * никак не связанную с чатом доктора: получалось две истории, доктор
+     * не помнил, о чём шла речь в другой, а пользователь не знал, куда
+     * смотреть. Теперь это обычное сообщение в единственный чат.
+     * -------------------------------------------------------------------- */
+    sendFromApp: function (prompt) {
+        if (Doctor.isLoading) {
+            UI.showToast('Запрос уже отправлен, подождите');
+            return;
+        }
+        if (!navigator.onLine) {
+            UI.showToast('Нет соединения с интернетом', 3500);
+            return;
+        }
+
+        App.navigateTo('doctor');
+        Doctor.renderHistory();
+        Doctor.updateTitle();
+        Doctor.sendMessage(prompt);
+    },
+
+    /* presetText — текст, отправляемый не из поля ввода, а другой частью
+       приложения (дневник, график) */
+    sendMessage: function (presetText) {
         if (Doctor.isLoading) return;
 
         var input = document.getElementById('chat-input');
-        var text = input.value.trim();
+        var text = presetText || (input ? input.value.trim() : '');
         if (!text) return;
 
-        input.value = '';
+        if (!presetText && input) input.value = '';
         Doctor.isLoading = true;
 
         var history = Doctor.getHistory();
@@ -599,7 +625,13 @@ var Doctor = {
         var container = document.getElementById('chat-messages');
         if (!container) return;
 
+        // Старые консультации из дневника переносим в общую историю
+        Diary.migrateChatToDoctor();
+
         container.innerHTML = '';
+
+        // Пока не выяснено, кого консультируем, чат не показываем
+        if (Doctor.renderSubjectQuestion(container)) return;
 
         var history = Doctor.getHistory();
         if (history.length === 0) {
@@ -619,6 +651,65 @@ var Doctor = {
         for (var i = 0; i < history.length; i++) {
             Doctor.addBubble(history[i].role, history[i].content, undefined, undefined, i);
         }
+    },
+
+    /* ======================================================================
+     * КОГО КОНСУЛЬТИРУЕМ (ТЗ v3.2, пункт 2)
+     *
+     * Когда в семье несколько профилей, доктор раньше молча брал активный
+     * и начинал консультировать — а спросили, может быть, про другого.
+     * Теперь при входе в чат приложение выясняет это само, до отправки
+     * первого сообщения. Спрашивает именно приложение, а не модель:
+     * ответ не тратит запрос к API и не засоряет историю переписки.
+     *
+     * Выбор действует до конца сеанса. У каждого профиля своя история,
+     * поэтому выбор человека переключает и переписку.
+     * ==================================================================== */
+    _subject: null,
+
+    subjectNeeded: function () {
+        var profiles = Storage.getProfiles();
+        if (profiles.length < 2) return false;
+        return Doctor._subject !== Storage.getActiveId();
+    },
+
+    /* Возвращает true, если вместо чата показан вопрос */
+    renderSubjectQuestion: function (container) {
+        if (!Doctor.subjectNeeded()) return false;
+
+        var profiles = Storage.getProfiles();
+        var activeId = Storage.getActiveId();
+        var active = Storage.getActiveProfile();
+
+        var html = '<div class="chat-subject">' +
+            '<div class="chat-subject-icon">🩺</div>' +
+            '<h3>Кого сегодня консультируем?</h3>' +
+            '<p>В карточке семьи несколько человек. Сейчас выбран профиль ' +
+            '<strong>' + UI.escapeHtml(active ? active.name : '—') + '</strong>. ' +
+            'У каждого своя переписка и свои нормы показателей.</p>' +
+            '<div class="chat-subject-list">';
+
+        for (var i = 0; i < profiles.length; i++) {
+            var p = profiles[i];
+            html += '<button class="btn ' +
+                (p.id === activeId ? 'btn-primary' : 'btn-outline') +
+                '" onclick="Doctor.chooseSubject(\'' + UI.escapeHtml(p.id) + '\')">' +
+                UI.escapeHtml(p.name) + '</button>';
+        }
+
+        html += '</div></div>';
+        container.innerHTML = html;
+        return true;
+    },
+
+    chooseSubject: function (id) {
+        if (id !== Storage.getActiveId()) {
+            Storage.setActiveId(id);
+        }
+        Doctor._subject = id;
+        Doctor.updateTitle();
+        Doctor.renderHistory();
+        UI.showToast('Консультация для: ' + Storage.activeName(), 3000);
     },
 
     /* ----------------------------------------------------------------------
