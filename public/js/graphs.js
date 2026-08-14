@@ -577,12 +577,18 @@ var Graphs = {
             '<p><strong>Период:</strong> ' + UI.escapeHtml(period) + '<br>' +
             '<strong>Показатель:</strong> ' + UI.escapeHtml(p.name) + '</p>';
 
-        // Картинка графика берётся прямо из canvas Chart.js
+        // Картинка графика берётся прямо из canvas Chart.js.
+        // width и height проставлены явно, чтобы браузер зарезервировал
+        // место под картинку ещё до того, как её раскодирует: без этого
+        // график периодически пропадал из готового документа.
         var chartCanvas = document.getElementById('gr-canvas');
         if (chartCanvas) {
-            body += '<p style="text-align:center"><img src="' +
-                chartCanvas.toDataURL('image/png') +
-                '" style="width:100%;max-width:720px;height:auto"></p>';
+            body += '<div class="chart-box"><img src="' +
+                chartCanvas.toDataURL('image/png') + '"' +
+                ' width="' + chartCanvas.width + '"' +
+                ' height="' + chartCanvas.height + '"' +
+                ' alt="График измерений"' +
+                ' style="width:100%;max-width:720px;height:auto"></div>';
         }
 
         body += '<table class="grid"><tr>' +

@@ -452,10 +452,11 @@ var Diary = {
             '<div class="dv-item-brief">' + brief + '</div>' +
             devHtml +
             '</div>' +
+            // Печать и удаление одного дня убраны из карточки (ТЗ v3.2
+            // часть 2, пункт 2): они дублировали кнопки над списком.
+            // Отметить один день галочкой — это и есть период из одного дня.
             '<div class="dv-item-actions">' +
             '<button class="btn btn-outline btn-small" onclick="Diary.openRecord(\'' + rec.date + '\')">Откр.</button>' +
-            '<button class="btn btn-outline btn-small" onclick="Diary.printRecord(\'' + rec.date + '\')" title="Печать или сохранение в PDF">🖨️ / 📄</button>' +
-            '<button class="dv-del" onclick="Diary.deleteRecord(\'' + rec.date + '\')" title="Удалить">✕</button>' +
             '</div></div>';
     },
 
@@ -1494,6 +1495,12 @@ var Diary = {
             'table.grid td{border:1px solid #CCC;padding:6px;text-align:center}' +
             'table.grid tr:nth-child(even) td{background:#F9F9F9}' +
             'tr{page-break-inside:avoid;break-inside:avoid}' +
+            // Картинка графика: место под неё резервируется заранее
+            // (у <img> проставлены width и height), а сама она не режется
+            // между страницами
+            'img{max-width:100%;height:auto}' +
+            '.chart-box{text-align:center;margin:16px 0;' +
+            'page-break-inside:avoid;break-inside:avoid}' +
             'p{margin:6px 0}hr{border:none;border-top:1px solid #ddd;margin:16px 0}' +
             '.footer{text-align:center;margin-top:30px;padding-top:16px;border-top:1px solid #ddd;' +
             'color:#999;font-size:11px}' +
@@ -1515,8 +1522,62 @@ var Diary = {
         w.document.write(html);
         w.document.close();
         w.focus();
-        w.print();
+        Diary.printWhenReady(w);
         UI.showToast('Для сохранения в PDF выберите принтер «Сохранить как PDF»', 5000);
+    },
+
+    /* ----------------------------------------------------------------------
+     * Печать только после того, как в новом окне загрузятся картинки.
+     *
+     * Плавающий баг с исчезающим графиком (ТЗ v3.2 часть 2, пункт 1).
+     * Раньше w.print() вызывался сразу после document.close(). График
+     * вставляется картинкой в виде data-URL, и браузеру нужно время, чтобы
+     * её раскодировать. Пока данных мало, он успевал; на 84 измерениях
+     * картинка становится большой, декодирование не успевало — и документ
+     * уходил на печать без графика. Отсюда «иногда есть, иногда нет».
+     *
+     * Подстраховка на 6 секунд: если картинка почему-то не загрузится,
+     * документ всё равно напечатается, просто без неё.
+     * -------------------------------------------------------------------- */
+    printWhenReady: function (w) {
+        var done = false;
+
+        function go() {
+            if (done) return;
+            done = true;
+            try {
+                w.focus();
+                w.print();
+            } catch (e) { /* окно могли закрыть раньше времени */ }
+        }
+
+        function waitImages() {
+            var imgs = w.document.images;
+            var pending = 0;
+
+            function step() {
+                pending--;
+                if (pending <= 0) setTimeout(go, 80);
+            }
+
+            for (var i = 0; i < imgs.length; i++) {
+                if (imgs[i].complete && imgs[i].naturalWidth > 0) continue;
+                pending++;
+                imgs[i].addEventListener('load', step);
+                imgs[i].addEventListener('error', step);
+            }
+
+            // Даже без картинок даём браузеру кадр на раскладку страницы
+            if (pending === 0) setTimeout(go, 80);
+        }
+
+        if (w.document.readyState === 'complete') {
+            waitImages();
+        } else {
+            w.addEventListener('load', waitImages);
+        }
+
+        setTimeout(go, 6000);
     },
 
     /* ======================================================================
