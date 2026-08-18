@@ -283,3 +283,52 @@
         flex: 1 1 100%;
     }
 }
+
+/* --- Несколько графиков на одной странице (ТЗ v3.3, п. 4) ---------------- */
+.gr-block {
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.gr-block:last-of-type {
+    border-bottom: none;
+}
+
+.gr-mhint {
+    margin: 0 0 var(--spacing-sm);
+    font-size: var(--font-size-small);
+    color: var(--color-text-secondary);
+}
+
+/* --- Пояснение к цвету точек (ТЗ v3.3, п. 5) ----------------------------- */
+.gr-plegend {
+    margin: var(--spacing-xs) 0 var(--spacing-sm);
+    text-align: center;
+    font-size: 15px;
+    color: var(--color-text-secondary);
+}
+
+.gr-pdot {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    vertical-align: -2px;
+    margin-right: 3px;
+}
+
+.gr-pdot-norm {
+    background: #FFFFFF;
+    border: 2px solid #0D47A1;
+}
+
+.gr-pdot-warn {
+    background: #FFC107;
+    border: 2px solid #FFC107;
+}
+
+.gr-pdot-danger {
+    background: #D32F2F;
+    border: 2px solid #D32F2F;
+}

@@ -27,6 +27,7 @@ var Period = {
         pulse: 'pulse',
         spo2: 'spo2',
         sugar: 'sugar',
+        sugar_after: 'sugar_after',
         temperature: 'temp'
     },
 
@@ -76,7 +77,8 @@ var Period = {
     tableHtml: function (list) {
         var html = '<table class="grid"><tr>' +
             '<th>Время</th><th>АД верх</th><th>АД низ</th><th>Пульс</th>' +
-            '<th>SpO2, %</th><th>Сахар</th><th>t°</th><th>Вес</th><th>ИМТ</th>' +
+            '<th>SpO2, %</th><th>Гликемия натощак</th><th>Гликемия после еды</th>' +
+            '<th>t°</th><th>Вес</th><th>ИМТ</th>' +
             '</tr>';
 
         for (var i = 0; i < list.length; i++) {
@@ -84,7 +86,7 @@ var Period = {
             var rows = Diary.validRows(rec.measurements);
             rows.sort(function (a, b) { return a.time < b.time ? -1 : 1; });
 
-            html += '<tr><td colspan="9" style="background:#DCDCDC;font-weight:bold;' +
+            html += '<tr><td colspan="10" style="background:#DCDCDC;font-weight:bold;' +
                 'text-align:left;padding:7px 8px">' +
                 UI.escapeHtml(UI.formatDate(rec.date)) +
                 ' <span style="font-weight:normal;color:#555">' + rows.length +
@@ -100,6 +102,7 @@ var Period = {
                     '<td>' + Diary.cellText(m.pulse) + '</td>' +
                     '<td>' + Diary.cellText(m.spo2) + '</td>' +
                     '<td>' + Diary.cellText(m.sugar) + '</td>' +
+                    '<td>' + Diary.cellText(m.sugar_after) + '</td>' +
                     '<td>' + Diary.cellText(m.temperature) + '</td>' +
                     '<td>' + Diary.cellText(m.weight) + '</td>' +
                     '<td>' + Diary.cellText(Norms.bmiFor(m.weight)) + '</td>' +
@@ -115,7 +118,8 @@ var Period = {
      * ==================================================================== */
     stats: function (list) {
         var acc = {
-            ad_top: [], ad_bottom: [], pulse: [], spo2: [], sugar: [], temperature: []
+            ad_top: [], ad_bottom: [], pulse: [], spo2: [],
+            sugar: [], sugar_after: [], temperature: []
         };
         var weights = [];
         var total = 0;
@@ -150,7 +154,8 @@ var Period = {
             { key: 'ad_bottom', name: 'Давление нижнее (диастолическое)', unit: 'мм рт.ст' },
             { key: 'pulse', name: 'Пульс', unit: 'уд/мин' },
             { key: 'spo2', name: 'Сатурация SpO2', unit: '%' },
-            { key: 'sugar', name: 'Сахар крови', unit: 'ммоль/л' },
+            { key: 'sugar', name: 'Гликемия натощак', unit: 'ммоль/л' },
+            { key: 'sugar_after', name: 'Гликемия после еды', unit: 'ммоль/л' },
             { key: 'temperature', name: 'Температура', unit: '°C' }
         ];
 

@@ -31,12 +31,13 @@ var Diary = {
         ad_bottom: { min: 30, max: 150, label: 'АД низ', unit: 'мм рт.ст', show: '30–150' },
         pulse: { min: 20, max: 200, label: 'пульса', unit: 'уд/мин', show: '20–200' },
         spo2: { min: 85, max: 100, label: 'SpO2', unit: '', show: '85–100%' },
-        sugar: { min: 2.0, max: 20.0, label: 'сахара', unit: 'ммоль/л', show: '2.0–20.0' },
+        sugar: { min: 2.0, max: 20.0, label: 'гликемии натощак', unit: 'ммоль/л', show: '2.0–20.0' },
+        sugar_after: { min: 2.0, max: 20.0, label: 'гликемии после еды', unit: 'ммоль/л', show: '2.0–20.0' },
         temperature: { min: 34.0, max: 43.0, label: 'температуры', unit: '°C', show: '34.0–43.0' },
         weight: { min: 20, max: 250, label: 'веса', unit: 'кг', show: '20–250' }
     },
 
-    FIELDS: ['time', 'ad_top', 'ad_bottom', 'pulse', 'spo2', 'sugar', 'temperature', 'weight'],
+    FIELDS: ['time', 'ad_top', 'ad_bottom', 'pulse', 'spo2', 'sugar', 'sugar_after', 'temperature', 'weight'],
 
     /* --- Состояние экрана -------------------------------------------------- */
     view: 'list',
@@ -101,6 +102,7 @@ var Diary = {
                 pulse: e.pulse || null,
                 spo2: null,               // в v1 сатурация не измерялась
                 sugar: e.sugar || null,
+                sugar_after: null,
                 temperature: e.temperature || null,
                 weight: e.weight || null,
                 notes: e.notes || ''
@@ -385,7 +387,8 @@ var Diary = {
             }
             if (last.pulse) vals.push(Diary.mark('pulse', last.pulse, 'пульс ' + last.pulse));
             if (last.spo2) vals.push(Diary.mark('spo2', last.spo2, 'SpO2 ' + last.spo2 + '%'));
-            if (last.sugar) vals.push(Diary.mark('sugar', last.sugar, 'сахар ' + last.sugar));
+            if (last.sugar) vals.push(Diary.mark('sugar', last.sugar, 'гликемия натощак ' + last.sugar));
+            if (last.sugar_after) vals.push(Diary.mark('sugar_after', last.sugar_after, 'после еды ' + last.sugar_after));
             if (last.temperature) vals.push(Diary.mark('temp', last.temperature, 't° ' + last.temperature));
             if (last.weight) vals.push('вес ' + last.weight);
             if (vals.length) brief += ' (' + vals.join(', ') + ')';
@@ -677,7 +680,7 @@ var Diary = {
             rec.measurements.push({
                 id: rec.measurements.length + 1,
                 time: '', ad_top: null, ad_bottom: null, pulse: null, spo2: null,
-                sugar: null, temperature: null, weight: null, notes: ''
+                sugar: null, sugar_after: null, temperature: null, weight: null, notes: ''
             });
         }
         if (!rec.measurements[row].time) {
@@ -779,6 +782,7 @@ var Diary = {
         html += '<div class="dv-daterow">' +
             '<label for="dv-date">Дата записи</label>' +
             '<input type="date" id="dv-date" value="' + (rec.date || '') + '"' +
+            ' max="' + Diary.todayISO() + '"' +
             (dateLocked ? ' data-locked="1"' : '') +
             ' onchange="Diary.onDateChange(this)">' +
             (dateLocked
@@ -803,6 +807,7 @@ var Diary = {
 
         host.innerHTML = html;
         Diary.bindTable();
+        Diary.updateDateState();
     },
 
     tableHtml: function () {
@@ -818,7 +823,9 @@ var Diary = {
             '<th>АД низ</th>' +
             '<th>Пульс</th>' +
             '<th>SpO2</th>' +
-            '<th>Сахар</th>' +
+            // Гликемия занимает две колонки: натощак и после еды (ТЗ v3.3, п. 2)
+            '<th class="dv-c-sugar" colspan="2">Сахар (гликемия)' +
+            '<span class="dv-th-sub">натощак · после еды</span></th>' +
             '<th>t°</th>' +
             '<th>Вес / ИМТ</th>' +
             '</tr></thead><tbody>';
@@ -832,7 +839,8 @@ var Diary = {
                 Diary.cell(i, 'ad_bottom', m.ad_bottom, 'number') +
                 Diary.cell(i, 'pulse', m.pulse, 'number') +
                 Diary.cell(i, 'spo2', m.spo2, 'number') +
-                Diary.cell(i, 'sugar', m.sugar, 'decimal') +
+                Diary.cell(i, 'sugar', m.sugar, 'decimal', 'натощак') +
+                Diary.cell(i, 'sugar_after', m.sugar_after, 'decimal', 'после еды') +
                 Diary.cell(i, 'temperature', m.temperature, 'decimal') +
                 Diary.weightCell(i, m.weight) +
                 '</tr>';
@@ -870,7 +878,7 @@ var Diary = {
         el.textContent = bmi !== null ? 'ИМТ ' + bmi : '';
     },
 
-    cell: function (row, field, value, kind) {
+    cell: function (row, field, value, kind, hint) {
         var attrs = 'inputmode="' + (kind === 'time' ? 'numeric' : 'decimal') + '"';
         if (kind === 'time') {
             attrs += ' maxlength="5" placeholder="ЧЧ:ММ"';
@@ -878,6 +886,12 @@ var Diary = {
             attrs += ' maxlength="5"';
         } else {
             attrs += ' maxlength="3"';
+        }
+        // Подсказка при наведении и в пустой ячейке — чтобы два поля
+        // гликемии не путались местами
+        if (hint) {
+            attrs += ' title="' + UI.escapeHtml(hint) + '"' +
+                ' placeholder="' + UI.escapeHtml(hint) + '"';
         }
         var v = (value === null || value === undefined) ? '' : value;
         return '<td><input type="text" class="dv-cell" data-row="' + row +
@@ -947,7 +961,7 @@ var Diary = {
             rec.measurements.push({
                 id: rec.measurements.length + 1,
                 time: '', ad_top: null, ad_bottom: null, pulse: null, spo2: null,
-                sugar: null, temperature: null, weight: null, notes: ''
+                sugar: null, sugar_after: null, temperature: null, weight: null, notes: ''
             });
         }
         var m = rec.measurements[row];
@@ -1094,6 +1108,17 @@ var Diary = {
             return;
         }
 
+        // Валидация №18: дата не может быть в будущем (ТЗ v3.3, пункт 1).
+        // Обычно это опечатка в году или месяце, и без проверки запись
+        // потом теряется в конце списка.
+        if (newDate > Diary.todayISO()) {
+            rec.date = '';
+            Diary.showDateError('Неправильная дата: нельзя записать измерения ' +
+                'на будущий день. Проверьте число, месяц и год.');
+            Diary.updateDateState();
+            return;
+        }
+
         // Нельзя завести черновик на день, который уже завершён
         var records = Diary.getRecords();
         if (records[newDate] && Diary._editingDay !== newDate) {
@@ -1105,7 +1130,26 @@ var Diary = {
 
         Diary.showDateError('');
         rec.date = newDate;
+        Diary.updateDateState();
         Diary.autosave();
+    },
+
+    /* ----------------------------------------------------------------------
+     * Пока дата не заполнена или неправильна, вводить измерения нельзя:
+     * поля таблицы гасятся (ТЗ v3.3, пункт 1).
+     * -------------------------------------------------------------------- */
+    updateDateState: function () {
+        var rec = Diary._current;
+        var ok = !!(rec && rec.date && rec.date <= Diary.todayISO());
+
+        var wrap = document.querySelector('.dv-tablewrap');
+        if (wrap) wrap.classList.toggle('dv-tablewrap-off', !ok);
+
+        var cells = document.querySelectorAll('.dv-cell');
+        for (var i = 0; i < cells.length; i++) cells[i].disabled = !ok;
+
+        var input = document.getElementById('dv-date');
+        if (input) input.classList.toggle('dv-date-err', !ok && !!(rec && !rec.date));
     },
 
     focusDate: function () {
@@ -1376,7 +1420,8 @@ var Diary = {
                 if (m.ad_top && m.ad_bottom) parts.push('АД ' + m.ad_top + '/' + m.ad_bottom);
                 if (m.pulse) parts.push('Пульс ' + m.pulse);
                 if (m.spo2) parts.push('SpO2 ' + m.spo2 + '%');
-                if (m.sugar) parts.push('Сахар ' + m.sugar);
+                if (m.sugar) parts.push('Гликемия натощак ' + m.sugar);
+                if (m.sugar_after) parts.push('Гликемия после еды ' + m.sugar_after);
                 if (m.temperature) parts.push('t° ' + m.temperature);
                 if (m.weight) {
                     var bmi = Norms.bmiFor(m.weight);
@@ -1448,7 +1493,8 @@ var Diary = {
         var body = '<h2>Дневник здоровья за ' + UI.escapeHtml(Diary.formatDay(day)) + '</h2>';
         body += '<table class="grid"><tr>' +
             '<th>№</th><th>Время</th><th>АД верх</th><th>АД низ</th>' +
-            '<th>Пульс</th><th>SpO2, %</th><th>Сахар</th><th>t°</th>' +
+            '<th>Пульс</th><th>SpO2, %</th>' +
+            '<th>Гликемия натощак</th><th>Гликемия после еды</th><th>t°</th>' +
             '<th>Вес</th><th>ИМТ</th></tr>';
         for (var i = 0; i < rows.length; i++) {
             var m = rows[i];
@@ -1460,6 +1506,7 @@ var Diary = {
                 '<td>' + Diary.cellText(m.pulse) + '</td>' +
                 '<td>' + Diary.cellText(m.spo2) + '</td>' +
                 '<td>' + Diary.cellText(m.sugar) + '</td>' +
+                '<td>' + Diary.cellText(m.sugar_after) + '</td>' +
                 '<td>' + Diary.cellText(m.temperature) + '</td>' +
                 '<td>' + Diary.cellText(m.weight) + '</td>' +
                 '<td>' + Diary.cellText(Norms.bmiFor(m.weight)) + '</td>' +
@@ -1588,7 +1635,7 @@ var Diary = {
     rowHasValues: function (m) {
         if (!m) return false;
         return !!(m.ad_top || m.ad_bottom || m.pulse || m.spo2 ||
-            m.sugar || m.temperature || m.weight);
+            m.sugar || m.sugar_after || m.temperature || m.weight);
     },
 
     /* ======================================================================
@@ -1605,7 +1652,8 @@ var Diary = {
         { norm: 'ad_bottom', from: 'ad_bottom', label: 'АД низ' },
         { norm: 'pulse', from: 'pulse', label: 'Пульс' },
         { norm: 'spo2', from: 'spo2', label: 'SpO2' },
-        { norm: 'sugar', from: 'sugar', label: 'Сахар' },
+        { norm: 'sugar', from: 'sugar', label: 'Гликемия натощак' },
+        { norm: 'sugar_after', from: 'sugar_after', label: 'Гликемия после еды' },
         { norm: 'temp', from: 'temperature', label: 't°' },
         { norm: 'bmi', from: '_bmi', label: 'ИМТ' }
     ],

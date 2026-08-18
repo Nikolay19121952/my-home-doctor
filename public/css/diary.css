@@ -733,3 +733,28 @@
         font-size: 15px;
     }
 }
+
+/* --- Гликемия: две колонки в одном заголовке (ТЗ v3.3, п. 2) ------------- */
+.dv-table th.dv-c-sugar {
+    line-height: 1.2;
+}
+
+.dv-th-sub {
+    display: block;
+    font-weight: 400;
+    font-size: 13px;
+    opacity: 0.85;
+    margin-top: 2px;
+}
+
+/* --- Дата в будущем: таблица заблокирована (ТЗ v3.3, п. 1) --------------- */
+.dv-tablewrap-off {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.dv-date-err,
+#dv-date.dv-date-err {
+    border-color: var(--color-danger);
+    background: #FFF0F0;
+}
