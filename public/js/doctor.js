@@ -293,7 +293,7 @@ var Doctor = {
         Doctor.isLoading = true;
 
         var history = Doctor.getHistory();
-        Doctor.addBubble('user', text);
+        Doctor.addBubble('user', text, undefined, undefined, undefined, Doctor.stamp());
         Doctor.showTyping();
 
         var apiHistory = [];
@@ -337,8 +337,8 @@ var Doctor = {
                         reply = reply.replace(MARKER, '').trim();
                     }
 
-                    history.push({ role: 'user', content: text });
-                    history.push({ role: 'assistant', content: reply });
+                    history.push({ role: 'user', content: text, at: Doctor.stamp() });
+                    history.push({ role: 'assistant', content: reply, at: Doctor.stamp() });
                     var trimmed = false;
                     if (history.length > 40) {
                         history = history.slice(history.length - 40);
@@ -358,10 +358,10 @@ var Doctor = {
                     } else if (Doctor._accumulatedParts.length > 0) {
                         Doctor._accumulatedParts.push(reply);
                         var fullText = Doctor._accumulatedParts.join('\n\n');
-                        Doctor.addBubble('assistant', reply, true, fullText, idx);
+                        Doctor.addBubble('assistant', reply, true, fullText, idx, history[idx].at);
                         Doctor._accumulatedParts = [];
                     } else {
-                        Doctor.addBubble('assistant', reply, undefined, undefined, idx);
+                        Doctor.addBubble('assistant', reply, undefined, undefined, idx, history[idx].at);
                     }
 
                     // При обрезке истории номера всех прежних сообщений
@@ -436,8 +436,8 @@ var Doctor = {
                         reply = reply.replace(MARKER, '').trim();
                     }
 
-                    history.push({ role: 'user', content: 'Продолжай' });
-                    history.push({ role: 'assistant', content: reply });
+                    history.push({ role: 'user', content: 'Продолжай', at: Doctor.stamp() });
+                    history.push({ role: 'assistant', content: reply, at: Doctor.stamp() });
                     if (history.length > 40) {
                         history = history.slice(history.length - 40);
                     }
@@ -450,7 +450,7 @@ var Doctor = {
                     } else {
                         Doctor._accumulatedParts.push(reply);
                         var fullText = Doctor._accumulatedParts.join('\n\n');
-                        Doctor.addBubble('assistant', reply, true, fullText, history.length - 1);
+                        Doctor.addBubble('assistant', reply, true, fullText, history.length - 1, history[history.length - 1].at);
                         Doctor._accumulatedParts = [];
                     }
                 } catch (e) {
@@ -482,7 +482,7 @@ var Doctor = {
         xhr.send(body);
     },
 
-    addBubble: function (role, text, showButtons, fullText, historyIndex) {
+    addBubble: function (role, text, showButtons, fullText, historyIndex, at) {
         var container = document.getElementById('chat-messages');
         var bubble = document.createElement('div');
         bubble.className = role === 'user' ? 'chat-bubble chat-bubble-user' : 'chat-bubble chat-bubble-bot';
@@ -490,7 +490,11 @@ var Doctor = {
         var formatted = UI.escapeHtml(text)
             .replace(/\n\n/g, '</p><p>')
             .replace(/\n/g, '<br>');
-        bubble.innerHTML = '<p>' + formatted + '</p>';
+
+        var time = Doctor.timeOf(at);
+        bubble.innerHTML =
+            (time ? '<span class="chat-time">[' + time + ']</span> ' : '') +
+            '<p>' + formatted + '</p>';
 
         if (role === 'assistant' && showButtons !== false) {
             var textForBtns = fullText || text;
@@ -648,9 +652,64 @@ var Doctor = {
             return;
         }
 
+        // Разделитель дня и время каждого сообщения (ТЗ v3.4, пункт 13)
+        var lastDay = '';
         for (var i = 0; i < history.length; i++) {
-            Doctor.addBubble(history[i].role, history[i].content, undefined, undefined, i);
+            var day = Doctor.dayOf(history[i].at);
+            if (day && day !== lastDay) {
+                Doctor.addDaySeparator(container, history[i].at);
+                lastDay = day;
+            }
+            Doctor.addBubble(history[i].role, history[i].content,
+                undefined, undefined, i, history[i].at);
         }
+    },
+
+    /* ======================================================================
+     * ДАТИРОВКА ПЕРЕПИСКИ (ТЗ v3.4, пункт 13)
+     *
+     * Раньше чат шёл сплошным потоком: непонятно, в какой день был разговор
+     * и сколько прошло между сообщениями. Теперь при смене дня появляется
+     * разделитель, а у каждого сообщения — время.
+     *
+     * У сообщений, записанных до версии 3.7, времени нет: восстановить его
+     * неоткуда. Такие сообщения показываются без времени и без разделителя,
+     * всё остальное работает как прежде.
+     * ==================================================================== */
+    stamp: function () {
+        return new Date().toISOString();
+    },
+
+    dayOf: function (iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    },
+
+    timeOf: function (iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        return String(d.getHours()).padStart(2, '0') + ':' +
+            String(d.getMinutes()).padStart(2, '0');
+    },
+
+    dayTitle: function (iso) {
+        var d = new Date(iso);
+        var months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+            'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+        var week = ['воскресенье', 'понедельник', 'вторник', 'среда',
+            'четверг', 'пятница', 'суббота'];
+        return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() +
+            ', ' + week[d.getDay()];
+    },
+
+    addDaySeparator: function (container, iso) {
+        var el = document.createElement('div');
+        el.className = 'chat-day';
+        el.textContent = Doctor.dayTitle(iso);
+        container.appendChild(el);
     },
 
     /* ======================================================================

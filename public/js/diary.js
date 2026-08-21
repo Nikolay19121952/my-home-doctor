@@ -31,8 +31,10 @@ var Diary = {
         ad_bottom: { min: 30, max: 150, label: 'АД низ', unit: 'мм рт.ст', show: '30–150' },
         pulse: { min: 20, max: 200, label: 'пульса', unit: 'уд/мин', show: '20–200' },
         spo2: { min: 85, max: 100, label: 'SpO2', unit: '', show: '85–100%' },
-        sugar: { min: 2.0, max: 20.0, label: 'гликемии натощак', unit: 'ммоль/л', show: '2.0–20.0' },
-        sugar_after: { min: 2.0, max: 20.0, label: 'гликемии после еды', unit: 'ммоль/л', show: '2.0–20.0' },
+        // Нижняя граница опущена до 1.5: тяжёлая гипогликемия должна
+        // попадать в дневник, а не отвергаться как опечатка (ТЗ v3.4, п. 10)
+        sugar: { min: 1.5, max: 20.0, label: 'гликемии натощак', unit: 'ммоль/л', show: '1.5–20.0' },
+        sugar_after: { min: 1.5, max: 20.0, label: 'гликемии после еды', unit: 'ммоль/л', show: '1.5–20.0' },
         temperature: { min: 34.0, max: 43.0, label: 'температуры', unit: '°C', show: '34.0–43.0' },
         weight: { min: 20, max: 250, label: 'веса', unit: 'кг', show: '20–250' }
     },
@@ -190,6 +192,11 @@ var Diary = {
      * ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ
      * ==================================================================== */
     render: function () {
+        // Черновик мог исчезнуть, пока экран формы оставался выбранным:
+        // например, при переключении члена семьи. Без этой проверки
+        // раздел падал с ошибкой при следующем открытии.
+        if (Diary.view === 'form' && !Diary._current) Diary.view = 'list';
+
         if (Diary.view === 'form') return Diary.renderForm();
         return Diary.renderList();
     },
@@ -808,6 +815,7 @@ var Diary = {
         host.innerHTML = html;
         Diary.bindTable();
         Diary.updateDateState();
+        Diary.applySugarLocks();
     },
 
     tableHtml: function () {
@@ -867,6 +875,54 @@ var Diary = {
         return '<td class="dv-c-weight"><input type="text" class="dv-cell" data-row="' + row +
             '" data-field="weight" value="' + UI.escapeHtml(weight === null || weight === undefined ? '' : String(weight)) +
             '" inputmode="decimal" maxlength="5">' + hint + '</td>';
+    },
+
+    /* ----------------------------------------------------------------------
+     * Гликемия натощак и после еды в одном измерении (ТЗ v3.4, пункт 2).
+     *
+     * Одно измерение — это один момент времени, а человек не может быть
+     * одновременно натощак и после еды. Поэтому заполненное поле гасит
+     * соседнее; чтобы поменять выбор, достаточно очистить заполненное.
+     * Оба значения за день по-прежнему записываются — разными строками.
+     * -------------------------------------------------------------------- */
+    lockOtherSugar: function (row, field) {
+        var other = (field === 'sugar') ? 'sugar_after' : 'sugar';
+        var rec = Diary._current;
+        var m = rec && rec.measurements[row];
+        if (!m) return;
+
+        var filled = m[field] !== null && m[field] !== undefined && m[field] !== '';
+        var el = document.querySelector('.dv-cell[data-row="' + row +
+            '"][data-field="' + other + '"]');
+        if (!el) return;
+
+        // Гасим соседнее поле, только если оно пустое: заполненные значения
+        // из старых записей блокировать нельзя, иначе их не исправить
+        var otherFilled = m[other] !== null && m[other] !== undefined && m[other] !== '';
+        var lock = filled && !otherFilled;
+
+        el.disabled = lock;
+        el.classList.toggle('dv-cell-locked', lock);
+        el.title = lock
+            ? 'Заполнено «' + (field === 'sugar' ? 'натощак' : 'после еды') +
+              '». Очистите это значение, чтобы ввести другое'
+            : (other === 'sugar' ? 'натощак' : 'после еды');
+    },
+
+    /* Проставить блокировку сразу после отрисовки таблицы */
+    applySugarLocks: function () {
+        var rec = Diary._current;
+        if (!rec) return;
+        for (var i = 0; i < rec.measurements.length; i++) {
+            var m = rec.measurements[i];
+            if (!m) continue;
+            if (m.sugar !== null && m.sugar !== undefined && m.sugar !== '') {
+                Diary.lockOtherSugar(i, 'sugar');
+            } else if (m.sugar_after !== null && m.sugar_after !== undefined &&
+                m.sugar_after !== '') {
+                Diary.lockOtherSugar(i, 'sugar_after');
+            }
+        }
     },
 
     /* Пересчитать подпись ИМТ после ввода веса */
@@ -1003,6 +1059,10 @@ var Diary = {
         /* --- Числовые поля ---------------------------------------------- */
         if (raw === '') {
             m[field] = null;
+            // Очистили одно поле гликемии — второе снова доступно
+            if (field === 'sugar' || field === 'sugar_after') {
+                Diary.lockOtherSugar(row, field);
+            }
             Diary.afterChange(row);
             return;
         }
@@ -1052,6 +1112,12 @@ var Diary = {
                 input.classList.add('dv-cell-warn');
                 Diary.showCellError(alert17, true);
             }
+        }
+
+        // Гликемия: натощак и после еды взаимно исключают друг друга
+        // в пределах одного измерения (ТЗ v3.4, пункт 2)
+        if (field === 'sugar' || field === 'sugar_after') {
+            Diary.lockOtherSugar(row, field);
         }
 
         // Уровень 1: тревога по абсолютным порогам. Не зависит от таблицы

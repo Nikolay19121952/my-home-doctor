@@ -40,6 +40,11 @@ var More = {
             '<span class="more-icon">⚙️</span>' +
             '<div class="more-text"><span class="more-label">Настройки</span><span class="more-desc">Экспорт и импорт данных</span></div>' +
             '</button>' +
+            '<button class="more-item" onclick="Reference.show()">' +
+            '<span class="more-icon">📊</span>' +
+            '<div class="more-text"><span class="more-label">Справочник показателей здоровья</span>' +
+            '<span class="more-desc">Нормы по возрасту и диагнозам</span></div>' +
+            '</button>' +
             '<button class="more-item" onclick="More.showSection(\'about\')">' +
             '<span class="more-icon">ℹ️</span>' +
             '<div class="more-text"><span class="more-label">О приложении</span><span class="more-desc">Описание, инструкция, обратная связь</span></div>' +
@@ -812,14 +817,14 @@ var More = {
         html += '<div class="about-section">' +
             '<div class="about-logo">🩺</div>' +
             '<h3>Мой домашний доктор</h3>' +
-            '<p class="about-version">Версия 3.6 · август 2026</p>' +
+            '<p class="about-version">Версия 3.7 · август 2026</p>' +
             '</div>';
 
         // ТЕКУЩАЯ ВЕРСИЯ
         html += '<div class="about-card">' +
             '<h3>📌 Текущая версия</h3>' +
             '<ul class="about-facts">' +
-            '<li><strong>Версия:</strong> 3.6</li>' +
+            '<li><strong>Версия:</strong> 3.7</li>' +
             '<li><strong>Дата выпуска:</strong> август 2026</li>' +
             '<li><strong>Статус:</strong> работает в production</li>' +
             '<li><strong>Показатели дневника:</strong> 8 — давление верхнее и нижнее, ' +
@@ -1041,7 +1046,7 @@ var More = {
             '<div class="about-release">' +
             '<div class="about-release-head"><span class="about-release-ver">v3.6</span>' +
             '<span class="about-release-date">август 2026</span>' +
-            '<span class="about-release-status about-done">текущая</span></div>' +
+            '<span class="about-release-status about-done">запущено</span></div>' +
             '<ul><li>Гликемия разделена на два поля: натощак и после еды</li>' +
             '<li>У каждого из них своя норма и свой контроль отклонений</li>' +
             '<li>Дату записи нельзя поставить на будущий день</li>' +
@@ -1052,6 +1057,25 @@ var More = {
             '<li>У каждого показателя свой цвет линии, он не совпадает ' +
             'с цветом точек: линия показывает тренд, точка — опасность</li>' +
             '<li>В таблице значений сразу все выбранные показатели</li></ul></div>' +
+
+            '<div class="about-release">' +
+            '<div class="about-release-head"><span class="about-release-ver">v3.7</span>' +
+            '<span class="about-release-date">август 2026</span>' +
+            '<span class="about-release-status about-done">текущая</span></div>' +
+            '<ul><li>Новый раздел «Справочник показателей здоровья»: ' +
+            'полная таблица норм с поиском, фильтрами, пояснениями ' +
+            'и печатью</li>' +
+            '<li>Целевые уровни гликемии для всех категорий приведены ' +
+            'к справочнику ВОЗ</li>' +
+            '<li>Шаг отклонения по гликемии уменьшен до 1.0 ммоль/л</li>' +
+            '<li>Нижняя граница ввода гликемии опущена до 1.5: тяжёлая ' +
+            'гипогликемия теперь попадает в дневник</li>' +
+            '<li>В одном измерении заполняется либо «натощак», либо ' +
+            '«после еды» — второе поле гаснет</li>' +
+            '<li>Точки на графике одного размера: на длинном периоде ' +
+            'они больше не слипаются</li>' +
+            '<li>В чате появились разделители дней и время каждого ' +
+            'сообщения</li></ul></div>' +
 
             '</div></div>';
 
@@ -1077,7 +1101,7 @@ var More = {
         html += '<div class="about-card">' +
             '<h3>🗺️ План развития</h3>' +
             '<ul class="about-facts">' +
-            '<li><strong>v3.6</strong> — август 2026, текущая версия</li>' +
+            '<li><strong>v3.7</strong> — август 2026, текущая версия</li>' +
             '<li><strong>v4.0</strong> — облачная синхронизация без ручного переноса файлов, ' +
             'интерактивные графики и сравнение нескольких показателей</li>' +
             '<li><strong>v4.1</strong> — мобильное приложение или расширение возможностей</li>' +

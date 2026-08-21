@@ -1,0 +1,232 @@
+/* ============================================================================
+   СПРАВОЧНИК ПОКАЗАТЕЛЕЙ ЗДОРОВЬЯ — ТЗ v3.4, пункт 12
+   ========================================================================== */
+
+.rf-intro {
+    font-size: var(--font-size-small);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin-bottom: var(--spacing-md);
+}
+
+/* --- Поиск, фильтры, действия -------------------------------------------- */
+.rf-tools {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.rf-search {
+    width: 100%;
+    min-height: var(--touch-min);
+    padding: 0 var(--spacing-md);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+}
+
+.rf-search:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.rf-filters,
+.rf-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
+}
+
+.rf-filter {
+    min-height: var(--touch-min);
+    padding: 0 var(--spacing-md);
+    background: var(--color-card);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: var(--font-size-small);
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+.rf-filter-on {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+    font-weight: 600;
+}
+
+.rf-actions .btn {
+    min-height: var(--touch-min);
+    font-size: var(--font-size-small);
+}
+
+/* --- Недавно просмотренные ------------------------------------------------ */
+.rf-seen {
+    font-size: 15px;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.rf-seen-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: var(--color-primary);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* --- Таблица -------------------------------------------------------------- */
+.rf-tablewrap {
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-md);
+    -webkit-overflow-scrolling: touch;
+}
+
+.rf-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+    white-space: nowrap;
+}
+
+.rf-table th {
+    position: sticky;
+    top: 0;
+    background: var(--color-primary);
+    color: #fff;
+    padding: 8px 10px;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.25;
+}
+
+.rf-unit {
+    display: block;
+    font-weight: 400;
+    font-size: 12px;
+    opacity: 0.85;
+}
+
+.rf-table td {
+    border-top: 1px solid var(--color-border);
+    padding: 8px 10px;
+    text-align: center;
+}
+
+/* Чередование строк для читаемости */
+.rf-table tbody tr:nth-child(even of :not(.rf-details)) td {
+    background: #F7FAFD;
+}
+
+.rf-table tr.rf-row-mine td {
+    background: #FFF8E1;
+}
+
+.rf-c-name {
+    text-align: left !important;
+    white-space: normal;
+    min-width: 210px;
+}
+
+.rf-name {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 4px 0;
+    font: inherit;
+    font-weight: 600;
+    color: var(--color-text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.rf-more {
+    display: block;
+    font-weight: 400;
+    font-size: 13px;
+    color: var(--color-primary);
+}
+
+.rf-none {
+    color: var(--color-text-secondary);
+    font-size: 13px;
+}
+
+/* --- Подробности статьи --------------------------------------------------- */
+.rf-details td {
+    background: var(--color-primary-light) !important;
+    text-align: left !important;
+    white-space: normal;
+}
+
+.rf-det {
+    max-width: 720px;
+    font-size: var(--font-size-small);
+    line-height: 1.55;
+}
+
+.rf-det h4 {
+    margin: 0 0 var(--spacing-xs);
+    font-size: var(--font-size-base);
+    color: var(--color-primary-dark);
+}
+
+.rf-det p {
+    margin: 0 0 var(--spacing-sm);
+}
+
+.rf-det-age {
+    color: var(--color-text-secondary);
+}
+
+.rf-det-note {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: #FFF8E1;
+    border-left: 4px solid #FFA500;
+    border-radius: 4px;
+}
+
+.rf-det-src {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+}
+
+/* --- Источники ------------------------------------------------------------ */
+.rf-sources {
+    padding: var(--spacing-md);
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+
+.rf-sources ul {
+    margin: var(--spacing-xs) 0;
+    padding-left: var(--spacing-lg);
+}
+
+/* --- Смартфон ------------------------------------------------------------- */
+@media (max-width: 600px) {
+    .rf-table {
+        font-size: 14px;
+    }
+
+    .rf-c-name {
+        min-width: 160px;
+    }
+
+    .rf-actions .btn,
+    .rf-filter {
+        flex: 1 1 auto;
+    }
+}

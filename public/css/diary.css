@@ -758,3 +758,10 @@
     border-color: var(--color-danger);
     background: #FFF0F0;
 }
+
+/* Поле гликемии, недоступное из-за заполненного соседнего (ТЗ v3.4, п. 2) */
+.dv-cell-locked {
+    background: #F0F0F0;
+    color: var(--color-text-secondary);
+    cursor: not-allowed;
+}

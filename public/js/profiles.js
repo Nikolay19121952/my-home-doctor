@@ -60,6 +60,7 @@ var Profiles = {
         Diary._editingDay = null;
         Diary._selectedDays = [];
         Diary._listScroll = 0;
+        Diary.view = 'list';    // черновика больше нет — форму показывать нечем
 
         // Доктор должен заново уточнить, кого консультирует
         Doctor._subject = null;
