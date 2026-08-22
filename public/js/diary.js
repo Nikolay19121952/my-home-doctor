@@ -1124,6 +1124,9 @@ var Diary = {
         // норм и показывается сразу — это сигнал к действию, а не оценка.
         Diary.checkAlarm(m, field, num, input);
 
+        // Гликемия в жёлтой зоне: мягкая подсказка вместо тревоги (ТЗ v3.5)
+        if (Norms.isSugar(field)) Diary.sugarHint(field, num, input);
+
         // Валидация №12: лимит 36 измерений
         if (Diary.filledCount(rec.measurements) >= Diary.MAX_ROWS) {
             UI.showToast('Лимит 36 измерений достигнут. Завершите запись!', 3500);
@@ -1925,7 +1928,7 @@ var Diary = {
      * врач потом видел: тревога была, а не просто «показатель высокий».
      * ==================================================================== */
     checkAlarm: function (m, field, value, input) {
-        var alarm = Norms.alarmFor(field, value);
+        var alarm = Norms.alarmFor(field, value, Diary.article());
 
         if (!m.alarms) m.alarms = [];
         var pos = m.alarms.indexOf(field);
@@ -1946,16 +1949,40 @@ var Diary = {
         );
     },
 
+    /* ----------------------------------------------------------------------
+     * Гликемия ниже нормы, но выше порога критики (ТЗ v3.5).
+     *
+     * Красная зона показывается всплывающим окном — это сигнал к действию.
+     * Жёлтая обходится подсказкой под таблицей: пугать окном человека,
+     * у которого сахар просто у нижней границы, ни к чему.
+     * -------------------------------------------------------------------- */
+    sugarHint: function (field, value, input) {
+        var article = Diary.article();
+        var range = article && article[field];
+        if (!range) return;
+
+        var crit = Norms.critFor(article);
+        var low = (crit === null) ? range[0] : crit;
+
+        if (value < range[0] && value >= low) {
+            if (input) input.classList.add('dv-cell-warn');
+            Diary.showCellError(Norms.SUGAR_WARN_TEXT +
+                ' (ваша норма ' + Norms.num(range[0]) + '–' +
+                Norms.num(range[1]) + ')', true);
+        }
+    },
+
     /* Тревоги за день: по одной строке на сработавший показатель */
     dayAlarms: function (rec) {
         var out = [];
         if (!rec || !rec.measurements) return out;
 
+        var article = Diary.article();
         var rows = Diary.validRows(rec.measurements);
         rows.sort(function (a, b) { return a.time < b.time ? -1 : 1; });
 
         for (var i = 0; i < rows.length; i++) {
-            var list = Norms.alarmsForRow(rows[i]);
+            var list = Norms.alarmsForRow(rows[i], article);
             for (var j = 0; j < list.length; j++) {
                 out.push({
                     time: rows[i].time,

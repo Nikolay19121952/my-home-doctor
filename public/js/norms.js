@@ -48,32 +48,32 @@ var Norms = {
         {
             id: 'child_3_5', title: 'Дети 3–5 лет', minAge: 3, maxAge: 5,
             ad_top: [95, 115], ad_bottom: [55, 75], pulse: [80, 130],
-            spo2: [97, 100], sugar: [3.3, 5.0], sugar_after: [3.3, 7.8], temp: [36.3, 37.2], bmi: [14.0, 18.5]
+            spo2: [97, 100], sugar: [3.3, 5.0], sugar_after: [3.3, 7.8], sugar_crit: 2.8, temp: [36.3, 37.2], bmi: [14.0, 18.5]
         },
         {
             id: 'child_6_11', title: 'Дети 6–11 лет', minAge: 6, maxAge: 11,
             ad_top: [100, 125], ad_bottom: [60, 80], pulse: [70, 110],
-            spo2: [97, 100], sugar: [3.3, 5.5], sugar_after: [3.3, 7.8], temp: [36.2, 37.0], bmi: [14.5, 21.0]
+            spo2: [97, 100], sugar: [3.3, 5.5], sugar_after: [3.3, 7.8], sugar_crit: 2.8, temp: [36.2, 37.0], bmi: [14.5, 21.0]
         },
         {
             id: 'teen_12_17', title: 'Подростки 12–17 лет', minAge: 12, maxAge: 17,
             ad_top: [110, 140], ad_bottom: [65, 90], pulse: [60, 100],
-            spo2: [97, 100], sugar: [3.3, 5.5], sugar_after: [3.3, 7.8], temp: [36.2, 37.0], bmi: [16.0, 23.0]
+            spo2: [97, 100], sugar: [3.3, 5.5], sugar_after: [3.3, 7.8], sugar_crit: 2.8, temp: [36.2, 37.0], bmi: [16.0, 23.0]
         },
         {
             id: 'young_18_40', title: 'Молодые взрослые 18–40 лет', minAge: 18, maxAge: 40,
             ad_top: [100, 135], ad_bottom: [60, 90], pulse: [60, 100],
-            spo2: [96, 100], sugar: [3.3, 5.5], sugar_after: [3.3, 7.8], temp: [36.2, 36.9], bmi: [18.5, 24.9]
+            spo2: [96, 100], sugar: [3.3, 5.5], sugar_after: [3.3, 7.8], sugar_crit: 2.8, temp: [36.2, 36.9], bmi: [18.5, 24.9]
         },
         {
             id: 'adult_41_64', title: 'Взрослые 41–64 года', minAge: 41, maxAge: 64,
             ad_top: [110, 140], ad_bottom: [65, 90], pulse: [60, 100],
-            spo2: [95, 100], sugar: [3.3, 5.5], sugar_after: [3.3, 7.8], temp: [36.2, 36.9], bmi: [18.5, 24.9]
+            spo2: [95, 100], sugar: [3.3, 5.5], sugar_after: [3.3, 7.8], sugar_crit: 2.8, temp: [36.2, 36.9], bmi: [18.5, 24.9]
         },
         {
             id: 'senior_65', title: 'Пожилые 65 лет и старше', minAge: 65, maxAge: 200,
             ad_top: [120, 150], ad_bottom: [75, 95], pulse: [55, 85],
-            spo2: [94, 98], sugar: [4.0, 6.0], sugar_after: [4.0, 8.0], temp: [36.0, 36.7], bmi: [20.0, 28.0]
+            spo2: [94, 98], sugar: [4.0, 6.0], sugar_after: [4.0, 8.0], sugar_crit: 3.0, temp: [36.0, 36.7], bmi: [20.0, 28.0]
         }
     ],
 
@@ -88,21 +88,21 @@ var Norms = {
             id: 'hypertension1', title: 'Гипертония 1-й степени',
             short: 'Гипертония 1 ст.', group: 'hypertension', minAge: 18,
             ad_top: [140, 180], ad_bottom: [90, 110], pulse: [55, 90],
-            spo2: [95, 100], sugar: [5.0, 6.5], sugar_after: [5.0, 8.0], temp: [36.2, 36.9], bmi: [18.5, 27.0],
+            spo2: [95, 100], sugar: [5.0, 6.5], sugar_after: [5.0, 8.0], sugar_crit: 3.5, temp: [36.2, 36.9], bmi: [18.5, 27.0],
             note: 'Границы ориентировочные, уточните с врачом.'
         },
         {
             id: 'hypertension2', title: 'Гипертония 2-й степени',
             short: 'Гипертония 2 ст.', group: 'hypertension', minAge: 18,
             ad_top: [160, 200], ad_bottom: [100, 120], pulse: [55, 90],
-            spo2: [95, 100], sugar: [5.5, 7.0], sugar_after: [5.5, 9.0], temp: [36.2, 36.9], bmi: [18.5, 27.0],
+            spo2: [95, 100], sugar: [5.5, 7.0], sugar_after: [5.5, 9.0], sugar_crit: 3.5, temp: [36.2, 36.9], bmi: [18.5, 27.0],
             note: 'Требует постоянного контроля, консультируйтесь с врачом.'
         },
         {
             id: 'hypertension3', title: 'Гипертония 3-й степени',
             short: 'Гипертония 3 ст.', group: 'hypertension', minAge: 18,
             ad_top: [180, 220], ad_bottom: [120, 140], pulse: [55, 90],
-            spo2: [95, 100], sugar: [6.0, 7.5], sugar_after: [6.0, 10.0], temp: [36.2, 36.9], bmi: [18.5, 27.0],
+            spo2: [95, 100], sugar: [6.0, 7.5], sugar_after: [6.0, 10.0], sugar_crit: 3.5, temp: [36.2, 36.9], bmi: [18.5, 27.0],
             note: 'Критично! Требует немедленного контроля и консультации врача.'
         },
         {
@@ -110,7 +110,7 @@ var Norms = {
             short: 'Гипертония 2 ст. + атеросклероз БЦА',
             group: 'hypertension', minAge: 70,
             ad_top: [110, 180], ad_bottom: [65, 110], pulse: [55, 80],
-            spo2: [94, 100], sugar: [5.5, 7.0], sugar_after: [5.5, 9.0], temp: [36.0, 36.8], bmi: [20.0, 28.0],
+            spo2: [94, 100], sugar: [5.5, 7.0], sugar_after: [5.5, 9.0], sugar_crit: 3.5, temp: [36.0, 36.8], bmi: [20.0, 28.0],
             note: 'Сужение сосудов требует особого контроля. ' +
                 'Ваша персональная норма определяется врачом!'
         },
@@ -118,7 +118,7 @@ var Norms = {
             id: 'hypotension', title: 'Гипотензия (хроническое низкое давление)',
             short: 'Гипотензия', group: 'hypertension', minAge: 18,
             ad_top: [90, 120], ad_bottom: [60, 80], pulse: [60, 100],
-            spo2: [95, 100], sugar: [3.3, 5.5], sugar_after: [3.3, 7.8], temp: [36.2, 36.9], bmi: [18.5, 25.0],
+            spo2: [95, 100], sugar: [3.3, 5.5], sugar_after: [3.3, 7.8], sugar_crit: 2.8, temp: [36.2, 36.9], bmi: [18.5, 25.0],
             note: 'Низкое давление требует контроля врача. Избегайте резких движений, ' +
                 'проверьте уровень сахара. При атеросклерозе БЦА консультация ' +
                 'кардиолога обязательна!'
@@ -127,7 +127,7 @@ var Norms = {
             id: 'diabetes1', title: 'Сахарный диабет 1 типа',
             short: 'Диабет 1 типа', group: 'diabetes', minAge: 0,
             ad_top: [110, 135], ad_bottom: [65, 85], pulse: [60, 100],
-            spo2: [97, 100], sugar: [4.0, 7.0], sugar_after: [5.0, 10.0],
+            spo2: [97, 100], sugar: [4.0, 7.0], sugar_after: [5.0, 10.0], sugar_crit: 3.0,
             temp: [36.2, 37.0], bmi: [18.5, 23.0],
             note: 'Контроль сахара критичен! Целевые значения уточняются с эндокринологом.'
         },
@@ -135,7 +135,7 @@ var Norms = {
             id: 'diabetes2', title: 'Сахарный диабет 2 типа',
             short: 'Диабет 2 типа', group: 'diabetes', minAge: 40,
             ad_top: [130, 150], ad_bottom: [80, 100], pulse: [60, 90],
-            spo2: [95, 100], sugar: [5.0, 7.5], sugar_after: [7.0, 10.0],
+            spo2: [95, 100], sugar: [5.0, 7.5], sugar_after: [7.0, 10.0], sugar_crit: 3.5,
             temp: [36.2, 36.9], bmi: [18.5, 25.0],
             note: 'Требует постоянного мониторинга, уточните норму с эндокринологом.'
         },
@@ -143,54 +143,54 @@ var Norms = {
             id: 'diabetes3', title: 'Сахарный диабет 3 типа',
             short: 'Диабет 3 типа', group: 'diabetes', minAge: 0,
             ad_top: [110, 140], ad_bottom: [65, 90], pulse: [60, 100],
-            spo2: [95, 100], sugar: [5.5, 7.8], sugar_after: [7.8, 10.0],
+            spo2: [95, 100], sugar: [5.5, 7.8], sugar_after: [7.8, 10.0], sugar_crit: 3.5,
             temp: [36.2, 36.9], bmi: [18.5, 25.0],
             note: 'Редкая форма, требует специализированной консультации.'
         },
         {
             id: 'copd', title: 'ХОБЛ', short: 'ХОБЛ', minAge: 40,
             ad_top: [120, 150], ad_bottom: [75, 95], pulse: [60, 95],
-            spo2: [90, 96], sugar: [5.5, 7.5], sugar_after: [5.5, 10.0], temp: [36.2, 36.9], bmi: [18.5, 25.0],
+            spo2: [90, 96], sugar: [5.5, 7.5], sugar_after: [5.5, 10.0], sugar_crit: 3.5, temp: [36.2, 36.9], bmi: [18.5, 25.0],
             note: 'Сатурация ниже 90% требует дополнительного кислорода!'
         },
         {
             id: 'heart_failure', title: 'Хроническая сердечная недостаточность',
             short: 'ХСН', minAge: 50,
             ad_top: [95, 135], ad_bottom: [55, 85], pulse: [50, 85],
-            spo2: [95, 100], sugar: [6.0, 7.5], sugar_after: [6.0, 10.0], temp: [36.2, 36.9], bmi: [18.5, 25.0],
+            spo2: [95, 100], sugar: [6.0, 7.5], sugar_after: [6.0, 10.0], sugar_crit: 3.5, temp: [36.2, 36.9], bmi: [18.5, 25.0],
             note: 'Низкое давление может быть опасно! ' +
                 'Контролируйте слабость и одышку.'
         },
         {
             id: 'arrhythmia', title: 'Аритмия', short: 'Аритмия', minAge: 18,
             ad_top: [100, 145], ad_bottom: [60, 95], pulse: [40, 120],
-            spo2: [95, 100], sugar: [5.5, 7.0], sugar_after: [5.5, 9.0], temp: [36.2, 36.9], bmi: [18.5, 25.0],
+            spo2: [95, 100], sugar: [5.5, 7.0], sugar_after: [5.5, 9.0], sugar_crit: 3.5, temp: [36.2, 36.9], bmi: [18.5, 25.0],
             note: 'Главное — регулярность пульса, а не его частота. ' +
                 'Перебои требуют консультации кардиолога.'
         },
         {
             id: 'hypothyroidism', title: 'Гипотиреоз', short: 'Гипотиреоз', minAge: 18,
             ad_top: [110, 140], ad_bottom: [65, 90], pulse: [50, 80],
-            spo2: [95, 100], sugar: [4.0, 6.0], sugar_after: [4.0, 8.0], temp: [35.5, 36.5], bmi: [20.0, 28.0],
+            spo2: [95, 100], sugar: [4.0, 6.0], sugar_after: [4.0, 8.0], sugar_crit: 3.0, temp: [35.5, 36.5], bmi: [20.0, 28.0],
             note: 'Низкая температура вместе с усталостью — проверьте лечение.'
         },
         {
             id: 'anemia', title: 'Анемия', short: 'Анемия', minAge: 0,
             ad_top: [100, 135], ad_bottom: [60, 90], pulse: [70, 110],
-            spo2: [94, 100], sugar: [3.3, 5.5], sugar_after: [3.3, 7.8], temp: [36.2, 36.9], bmi: null,
+            spo2: [94, 100], sugar: [3.3, 5.5], sugar_after: [3.3, 7.8], sugar_crit: 2.8, temp: [36.2, 36.9], bmi: null,
             note: 'Высокий пульс при нормальном давлении — типичный признак.'
         },
         {
             id: 'ckd', title: 'Хроническая болезнь почек 3–4 стадии',
             short: 'ХБП 3–4', minAge: 50,
             ad_top: [130, 150], ad_bottom: [80, 100], pulse: [60, 90],
-            spo2: [95, 100], sugar: [6.5, 8.0], sugar_after: [6.5, 11.5], temp: [36.2, 36.9], bmi: [18.5, 25.0],
+            spo2: [95, 100], sugar: [6.5, 8.0], sugar_after: [6.5, 11.5], sugar_crit: 3.5, temp: [36.2, 36.9], bmi: [18.5, 25.0],
             note: 'Давление критично влияет на почки! Контролируйте его особенно тщательно.'
         },
         {
             id: 'pregnant', title: 'Беременность', short: 'Беременность', minAge: 0,
             ad_top: [100, 150], ad_bottom: [60, 95], pulse: [70, 100],
-            spo2: [95, 100], sugar: [3.3, 5.1], sugar_after: [3.3, 6.4], temp: [36.3, 37.0], bmi: null,
+            spo2: [95, 100], sugar: [3.3, 5.1], sugar_after: [3.3, 6.4], sugar_crit: 2.8, temp: [36.3, 37.0], bmi: null,
             note: 'Набор веса — строго по графику триместров, наблюдение у врача обязательно.'
         }
     ],
@@ -355,6 +355,19 @@ var Norms = {
             }
             merged[field] = (min === null) ? null : [min, max];
         }
+
+        // Порог критики по сахару — самый низкий из отмеченных статей.
+        // Диапазоны норм при объединении расширяются вниз, и порог должен
+        // опуститься вместе с ними, иначе он окажется выше нижней границы
+        // нормы и жёлтая зона исчезнет.
+        var crit = null;
+        for (var c = 0; c < sources.length; c++) {
+            var cv = Norms.critFor(sources[c]);
+            if (cv === null) continue;
+            if (crit === null || cv < crit) crit = cv;
+        }
+        if (crit !== null) merged.sugar_crit = crit;
+
         return merged;
     },
 
@@ -445,25 +458,49 @@ var Norms = {
             text: 'Очень высокий сахар. Свяжитесь с врачом'
         },
         {
-            field: 'sugar', label: 'Гликемия натощак', below: 3.5,
-            text: 'Низкий сахар. Примите быстрые углеводы — сок, сахар, конфету'
-        },
-        {
             field: 'sugar_after', label: 'Гликемия после еды', above: 13.0,
             text: 'Очень высокий сахар. Свяжитесь с врачом'
-        },
-        {
-            field: 'sugar_after', label: 'Гликемия после еды', below: 3.5,
-            text: 'Низкий сахар. Примите быстрые углеводы — сок, сахар, конфету'
         }
     ],
 
+    /* ----------------------------------------------------------------------
+     * Единственный порог тревоги, который зависит от диагноза, — нижний
+     * по гликемии (ТЗ v3.5).
+     *
+     * Все прочие пороги уровня 1 одинаковы для всех: их смысл в том, чтобы
+     * не зависеть от спорной таблицы. Но здесь общий порог 3.5 вступил
+     * в противоречие с самой нормой: у здорового человека 3.4 ммоль/л —
+     * это норма, и красная отметка на ней сбивала с толку. Поэтому критика
+     * по низкому сахару берётся из статьи: у здоровых 2.8, у пожилых
+     * и диабета 1 типа 3.0, при завышенных целевых уровнях 3.5.
+     * -------------------------------------------------------------------- */
+    SUGAR_CRIT_TEXT: 'КРИТИЧЕСКИ низкий сахар! Немедленно примите быстрые ' +
+        'углеводы — сок, сахар, конфету. При слабости, дрожи или спутанности ' +
+        'сознания вызовите скорую помощь: 112',
+
+    SUGAR_WARN_TEXT: 'Сахар ниже вашей нормы, но ещё не критично. ' +
+        'Перекусите и измерьте повторно через полчаса',
+
     /* Тревога по одному значению; null — если порог не сработал.
        Границы включительно: «≥180» и «≤85» из ТЗ. */
-    alarmFor: function (field, value) {
+    alarmFor: function (field, value, article) {
         if (value === null || value === undefined || value === '') return null;
         var v = Number(value);
         if (isNaN(v)) return null;
+
+        // Низкая гликемия: порог свой у каждой статьи
+        if (Norms.isSugar(field)) {
+            var art = article || Norms.articleFor(Storage.getActiveProfile());
+            var crit = Norms.critFor(art);
+            if (crit !== null && v < crit) {
+                return {
+                    field: field,
+                    label: (field === 'sugar' ? 'Гликемия натощак' : 'Гликемия после еды'),
+                    value: v,
+                    text: Norms.SUGAR_CRIT_TEXT
+                };
+            }
+        }
 
         for (var i = 0; i < Norms.ALARMS.length; i++) {
             var a = Norms.ALARMS[i];
@@ -479,13 +516,13 @@ var Norms = {
     },
 
     /* Все тревоги одного измерения */
-    alarmsForRow: function (m) {
+    alarmsForRow: function (m, article) {
         var out = [];
         if (!m) return out;
         var fields = ['ad_top', 'ad_bottom', 'pulse', 'spo2', 'temperature',
             'sugar', 'sugar_after'];
         for (var i = 0; i < fields.length; i++) {
-            var a = Norms.alarmFor(fields[i], m[fields[i]]);
+            var a = Norms.alarmFor(fields[i], m[fields[i]], article);
             if (a) out.push(a);
         }
         return out;
@@ -545,6 +582,15 @@ var Norms = {
         var distance = Math.round(Math.abs(v - bound) * 10) / 10;
         var level = (!step || distance > step) ? 'danger' : 'warn';
 
+        // Гликемия ниже нормы считается по трём зонам, а не по шагу
+        // (ТЗ v3.5). Иначе получалось противоречие: у здорового человека
+        // 3.4 ммоль/л — это норма, а красную отметку значение получало
+        // из-за общего для всех порога 3.5.
+        if (direction === 'below' && Norms.isSugar(field)) {
+            var crit = Norms.critFor(article);
+            if (crit !== null) level = (v < crit) ? 'danger' : 'warn';
+        }
+
         return {
             level: level,
             direction: direction,
@@ -553,6 +599,45 @@ var Norms = {
             range: range,
             step: step || null
         };
+    },
+
+    /* ======================================================================
+     * ТРИ ЗОНЫ ГЛИКЕМИИ (ТЗ v3.5)
+     *
+     * Зоны выводятся из одного числа — критического порога статьи:
+     *   белая  — внутри диапазона нормы;
+     *   жёлтая — от порога критики до нижней границы нормы;
+     *   красная — ниже порога критики.
+     *
+     * Хранить пять чисел, как предлагает ТЗ, не понадобилось: жёлтая зона
+     * однозначно определяется порогом и нижней границей нормы. Одно число
+     * вместо пяти означает, что зоны не могут разъехаться между собой при
+     * правке таблицы.
+     *
+     * Выше нормы всё осталось как было: в пределах шага тревоги — жёлтое,
+     * дальше — красное.
+     * ==================================================================== */
+    isSugar: function (field) {
+        return field === 'sugar' || field === 'sugar_after';
+    },
+
+    critFor: function (article) {
+        if (!article) return null;
+        return (article.sugar_crit === undefined) ? null : article.sugar_crit;
+    },
+
+    /* Границы трёх зон для показа в справочнике и подсказках */
+    sugarZones: function (article, field) {
+        var range = article && article[field];
+        var crit = Norms.critFor(article);
+        if (!range || crit === null) return null;
+        return { white: range, yellow: [crit, range[0]], red: crit };
+    },
+
+    /* Название зоны для конкретного значения: '', 'warn' или 'danger' */
+    sugarZone: function (article, field, value) {
+        var res = Norms.check(article, field, value);
+        return res ? res.level : '';
     },
 
     /* «на 11 ниже границы 90» — текст отклонения для карточки и документов */

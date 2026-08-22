@@ -263,7 +263,60 @@ var Reference = {
     range: function (article, key) {
         var r = article[key];
         if (!r) return '<span class="rf-none">по возрасту</span>';
-        return Norms.num(r[0]) + '–' + Norms.num(r[1]);
+
+        var html = Norms.num(r[0]) + '–' + Norms.num(r[1]);
+
+        // У гликемии под белой зоной сразу видно жёлтую и красную (ТЗ v3.5)
+        var z = Norms.isSugar(key) ? Norms.sugarZones(article, key) : null;
+        if (z) {
+            html += '<span class="rf-zones">🟡 ' + Norms.num(z.yellow[0]) + '–' +
+                Norms.num(z.yellow[1]) + ' · 🔴 &lt;' + Norms.num(z.red) + '</span>';
+        }
+        return html;
+    },
+
+    /* Те же три зоны строкой — для печатного документа */
+    zonesText: function (a) {
+        var z = Norms.sugarZones(a, 'sugar');
+        if (!z) return '';
+        return ' Гликемия натощак по зонам: норма ' +
+            Norms.num(z.white[0]) + '–' + Norms.num(z.white[1]) +
+            ', внимание ' + Norms.num(z.yellow[0]) + '–' + Norms.num(z.yellow[1]) +
+            ', критично ниже ' + Norms.num(z.red) + ' ммоль/л.';
+    },
+
+    /* Разбор трёх зон гликемии для карточки статьи */
+    zonesHtml: function (a) {
+        var fields = [
+            { key: 'sugar', title: 'Гликемия натощак' },
+            { key: 'sugar_after', title: 'Гликемия после еды' }
+        ];
+        var rows = '';
+
+        for (var i = 0; i < fields.length; i++) {
+            var z = Norms.sugarZones(a, fields[i].key);
+            if (!z) continue;
+            rows += '<tr><td class="rf-z-name">' + fields[i].title + '</td>' +
+                '<td><span class="rf-zdot rf-zdot-white"></span> ' +
+                Norms.num(z.white[0]) + '–' + Norms.num(z.white[1]) + '</td>' +
+                '<td><span class="rf-zdot rf-zdot-yellow"></span> ' +
+                Norms.num(z.yellow[0]) + '–' + Norms.num(z.yellow[1]) + '</td>' +
+                '<td><span class="rf-zdot rf-zdot-red"></span> ниже ' +
+                Norms.num(z.red) + '</td></tr>';
+        }
+        if (!rows) return '';
+
+        return '<div class="rf-zones-box">' +
+            '<p><strong>Три зоны гликемии, ммоль/л</strong></p>' +
+            '<table class="rf-ztable"><thead><tr><th></th>' +
+            '<th>норма</th><th>внимание</th><th>критично</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody></table>' +
+            '<p class="rf-z-note">Значение в белой зоне отметки не получает. ' +
+            'В жёлтой приложение мягко подскажет: сахар ниже вашей нормы. ' +
+            'В красной покажет предупреждение с призывом принять углеводы ' +
+            'и при необходимости вызвать помощь. Выше нормы работает «шаг ' +
+            'тревоги»: до 1 ммоль/л сверх границы — жёлтое, дальше — красное.</p>' +
+            '</div>';
     },
 
     detailsHtml: function (a) {
@@ -285,6 +338,8 @@ var Reference = {
         if (a.note) {
             html += '<p class="rf-det-note">⚠️ ' + UI.escapeHtml(a.note) + '</p>';
         }
+
+        html += Reference.zonesHtml(a);
 
         html += '<p><strong>Как приложение это использует.</strong> Значение внутри ' +
             'границ отметки не получает. Отклонение в пределах одного «шага тревоги» ' +
@@ -377,7 +432,8 @@ var Reference = {
             var art = list[j].a;
             body += '<p><strong>' + UI.escapeHtml(art.title) + '.</strong> ' +
                 UI.escapeHtml(Reference.WHY[art.id] || '') +
-                (art.note ? ' ' + UI.escapeHtml(art.note) : '') + '</p>';
+                (art.note ? ' ' + UI.escapeHtml(art.note) : '') +
+                Reference.zonesText(art) + '</p>';
         }
 
         body += '<h3>Источники</h3><ul>';
@@ -406,6 +462,13 @@ var Reference = {
                 var r = a[col.key];
                 lines.push('  ' + col.title + ': ' +
                     (r ? Norms.num(r[0]) + '–' + Norms.num(r[1]) + ' ' + col.unit : 'по возрасту'));
+            }
+            var zs = Norms.sugarZones(a, 'sugar');
+            if (zs) {
+                lines.push('  Гликемия натощак по зонам: норма ' +
+                    Norms.num(zs.white[0]) + '-' + Norms.num(zs.white[1]) +
+                    ', внимание ' + Norms.num(zs.yellow[0]) + '-' + Norms.num(zs.yellow[1]) +
+                    ', критично ниже ' + Norms.num(zs.red));
             }
             if (a.note) lines.push('  Примечание: ' + a.note);
             lines.push('');
