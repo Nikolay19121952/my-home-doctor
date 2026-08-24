@@ -817,14 +817,14 @@ var More = {
         html += '<div class="about-section">' +
             '<div class="about-logo">🩺</div>' +
             '<h3>Мой домашний доктор</h3>' +
-            '<p class="about-version">Версия 3.8 · август 2026</p>' +
+            '<p class="about-version">Версия 3.9 · август 2026</p>' +
             '</div>';
 
         // ТЕКУЩАЯ ВЕРСИЯ
         html += '<div class="about-card">' +
             '<h3>📌 Текущая версия</h3>' +
             '<ul class="about-facts">' +
-            '<li><strong>Версия:</strong> 3.8</li>' +
+            '<li><strong>Версия:</strong> 3.9</li>' +
             '<li><strong>Дата выпуска:</strong> август 2026</li>' +
             '<li><strong>Статус:</strong> работает в production</li>' +
             '<li><strong>Показатели дневника:</strong> 8 — давление верхнее и нижнее, ' +
@@ -1080,7 +1080,7 @@ var More = {
             '<div class="about-release">' +
             '<div class="about-release-head"><span class="about-release-ver">v3.8</span>' +
             '<span class="about-release-date">август 2026</span>' +
-            '<span class="about-release-status about-done">текущая</span></div>' +
+            '<span class="about-release-status about-done">запущено</span></div>' +
             '<ul><li>Гликемия оценивается по трём зонам: норма, внимание, ' +
             'критично</li>' +
             '<li>Устранено противоречие: значение в пределах нормы больше ' +
@@ -1090,6 +1090,17 @@ var More = {
             '<li>В жёлтой зоне — мягкая подсказка, в красной — ' +
             'предупреждение с призывом принять углеводы</li>' +
             '<li>В справочнике у гликемии видны все три зоны</li></ul></div>' +
+
+            '<div class="about-release">' +
+            '<div class="about-release-head"><span class="about-release-ver">v3.9</span>' +
+            '<span class="about-release-date">август 2026</span>' +
+            '<span class="about-release-status about-done">текущая</span></div>' +
+            '<ul><li>Выбор дней теперь следует за периодом: после кнопки ' +
+            '«Показать» отмечены ровно те дни, что попали в период</li>' +
+            '<li>График строится по тому периоду, который виден на экране</li>' +
+            '<li>Число отмеченных дней показано рядом с числом записей</li>' +
+            '<li>Первое измерение каждого дня на графике крупнее ' +
+            'остальных — видно границы дней</li></ul></div>' +
 
             '</div></div>';
 
@@ -1115,7 +1126,7 @@ var More = {
         html += '<div class="about-card">' +
             '<h3>🗺️ План развития</h3>' +
             '<ul class="about-facts">' +
-            '<li><strong>v3.8</strong> — август 2026, текущая версия</li>' +
+            '<li><strong>v3.9</strong> — август 2026, текущая версия</li>' +
             '<li><strong>v4.0</strong> — облачная синхронизация без ручного переноса файлов, ' +
             'интерактивные графики и сравнение нескольких показателей</li>' +
             '<li><strong>v4.1</strong> — мобильное приложение или расширение возможностей</li>' +

@@ -395,12 +395,14 @@ var Graphs = {
         Graphs.drawAll();
     },
 
-    /* Пояснение к цвету точек (пункт 5 ТЗ) */
+    /* Пояснение к цвету и размеру точек */
     pointLegend: function () {
         return '<p class="gr-plegend">' +
             '<span class="gr-pdot gr-pdot-norm"></span> норма · ' +
             '<span class="gr-pdot gr-pdot-warn"></span> внимание · ' +
-            '<span class="gr-pdot gr-pdot-danger"></span> критично</p>';
+            '<span class="gr-pdot gr-pdot-danger"></span> критично' +
+            '<br><span class="gr-pdot gr-pdot-first"></span> крупная точка — ' +
+            'первое измерение дня</p>';
     },
 
     statBox: function (label, value) {
@@ -504,17 +506,29 @@ var Graphs = {
     },
 
     /* ----------------------------------------------------------------------
-     * Цвет каждой точки по отклонению от индивидуальной нормы (пункт 5 ТЗ).
+     * Размер точек (ТЗ v3.6, пункт 2).
+     *
+     * Опасность по-прежнему показывает цвет, а размер отмечает границы
+     * дней: первое измерение каждого дня рисуется на 10% крупнее базового,
+     * остальные — на 20% мельче. Разница между ними получается около
+     * трети, и на графике видно, где начинается новый день.
+     *
+     * Разброс намеренно небольшой: при сильной разнице крупные отметки
+     * снова начали бы слипаться на периоде в сорок дней — ровно та беда,
+     * из-за которой в версии 3.6 все точки сделали одинаковыми.
+     * -------------------------------------------------------------------- */
+    POINT_BASE: 5,
+    POINT_FIRST: 5.5,   // первое измерение дня: +10%
+    POINT_REST: 4,      // остальные измерения дня: −20%
+
+    /* ----------------------------------------------------------------------
+     * Цвет каждой точки по отклонению от индивидуальной нормы.
      *
      * Белая точка на белом фоне была бы не видна, поэтому она рисуется
      * с обводкой цвета своей линии — получается «пустой» кружок, как
      * и в легенде.
-     *
-     * Размер у всех точек одинаковый: на периоде в сорок дней разный
-     * радиус приводил к тому, что крупные отметки слипались друг с другом
-     * и график становился нечитаемым. Опасность показывает цвет, не размер.
      * -------------------------------------------------------------------- */
-    pointColors: function (values, serie, article, height) {
+    pointColors: function (points, values, serie, article, height) {
         var fill = [];
         var border = [];
         var radius = [];
@@ -531,7 +545,9 @@ var Graphs = {
             var level = check ? check.level : '';
             fill.push(Graphs.POINT[level]);
             border.push(level ? Graphs.POINT[level] : serie.color);
-            radius.push(5);
+
+            var firstOfDay = (i === 0) || (points[i].date !== points[i - 1].date);
+            radius.push(firstOfDay ? Graphs.POINT_FIRST : Graphs.POINT_REST);
         }
         return { fill: fill, border: border, radius: radius };
     },
@@ -568,7 +584,7 @@ var Graphs = {
                 if (vals[v] !== null) allValues.push(Number(vals[v]));
             }
 
-            var colors = Graphs.pointColors(vals, serie, article, height);
+            var colors = Graphs.pointColors(points, vals, serie, article, height);
 
             datasets.push({
                 label: serie.label,
@@ -751,7 +767,8 @@ var Graphs = {
             }
 
             body += '<p style="text-align:center;font-size:12px;color:#555">' +
-                '◯ норма · ● внимание (жёлтая точка) · ● критично (красная точка)</p>';
+                '◯ норма · ● внимание (жёлтая точка) · ● критично (красная точка). ' +
+                'Крупная точка — первое измерение дня.</p>';
 
             body += '<table class="grid"><tr>' +
                 '<th>Всего измерений</th><th>Минимум</th><th>Максимум</th><th>Среднее</th>' +

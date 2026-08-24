@@ -332,3 +332,11 @@
     background: #D32F2F;
     border: 2px solid #D32F2F;
 }
+
+/* Крупная точка — первое измерение дня (ТЗ v3.6, п. 2) */
+.gr-pdot-first {
+    width: 17px;
+    height: 17px;
+    background: #FFFFFF;
+    border: 2px solid #0D47A1;
+}

@@ -261,7 +261,11 @@ var Diary = {
             '<h2 class="dv-title">📔 ' +
             (owner ? 'Дневник — ' + UI.escapeHtml(owner) : 'Мой дневник') + '</h2>' +
             '<p class="dv-sub">Показано ' + days.length + ' из ' + allDays.length +
-            (allDays.length === 1 ? ' записи' : ' записей') + '</p>' +
+            (allDays.length === 1 ? ' записи' : ' записей') +
+            // Счётчик отмеченных стоит рядом с числом показанных: раньше они
+            // были в разных концах экрана, и расхождение бросалось в глаза
+            // не сразу (ТЗ v3.6, пункт 1)
+            ' · отмечено ' + Diary._selectedDays.length + '</p>' +
             '</div>';
 
         // Напоминание о резервной копии — данные хранятся только в браузере
@@ -491,23 +495,48 @@ var Diary = {
         box.style.display = box.style.display === 'none' ? 'block' : 'none';
     },
 
+    /* ----------------------------------------------------------------------
+     * Выбор дней следует за периодом (ТЗ v3.6, пункт 1).
+     *
+     * Раньше кнопка «Показать» меняла только фильтр списка, а отметки
+     * оставались от прежнего периода. Получалось расхождение: список
+     * показывал 23 записи, а «Выбрано дней» держалось на семи — и график
+     * строился по старым семи дням, хотя на экране был другой период.
+     *
+     * Теперь применение периода отмечает ровно те дни, которые в него
+     * попали. Лишние можно снять галочками, как и раньше.
+     * -------------------------------------------------------------------- */
+    selectFiltered: function () {
+        var records = Diary.getRecords();
+        var days = Object.keys(records).sort(function (a, b) { return a < b ? 1 : -1; });
+        Diary._selectedDays = Diary.applyFilter(days);
+    },
+
     applyPeriod: function () {
         var from = document.getElementById('dv-from');
         var to = document.getElementById('dv-to');
-        Diary._filterFrom = from ? from.value : '';
-        Diary._filterTo = to ? to.value : '';
-        if (Diary._filterFrom && Diary._filterTo && Diary._filterFrom > Diary._filterTo) {
+        var newFrom = from ? from.value : '';
+        var newTo = to ? to.value : '';
+
+        if (newFrom && newTo && newFrom > newTo) {
             UI.showToast('Дата «с» позже даты «по» — проверьте период', 3000);
             return;
         }
+
+        Diary._filterFrom = newFrom;
+        Diary._filterTo = newTo;
         Diary._listOffset = 0;
+        Diary.selectFiltered();
         Diary.renderList();
+
+        UI.showToast('Отмечено дней: ' + Diary._selectedDays.length, 2500);
     },
 
     clearPeriod: function () {
         Diary._filterFrom = '';
         Diary._filterTo = '';
         Diary._listOffset = 0;
+        Diary._selectedDays = [];
         Diary.renderList();
     },
 
