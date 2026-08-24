@@ -401,8 +401,8 @@ var Graphs = {
             '<span class="gr-pdot gr-pdot-norm"></span> норма · ' +
             '<span class="gr-pdot gr-pdot-warn"></span> внимание · ' +
             '<span class="gr-pdot gr-pdot-danger"></span> критично' +
-            '<br><span class="gr-pdot gr-pdot-first"></span> крупная точка — ' +
-            'первое измерение дня · <span class="gr-daydash"></span> граница дня</p>';
+            '<br><span class="gr-psq"></span> квадрат — первое измерение дня · ' +
+            '<span class="gr-daydash"></span> граница дня</p>';
     },
 
     statBox: function (label, value) {
@@ -506,20 +506,31 @@ var Graphs = {
     },
 
     /* ----------------------------------------------------------------------
-     * Размер точек (ТЗ v3.6, пункт 2).
+     * Размер точек.
      *
-     * Опасность по-прежнему показывает цвет, а размер отмечает границы
-     * дней: первое измерение каждого дня рисуется на 10% крупнее базового,
-     * остальные — на 20% мельче. Разница между ними получается около
-     * трети, и на графике видно, где начинается новый день.
+     * Все точки одного размера, а размер зависит от того, сколько их на
+     * графике. На периоде в 49 дней это почти сто измерений: при радиусе
+     * 5 точки перекрывали друг друга, сливались в сплошную цепочку и
+     * закрывали саму линию. Теперь чем плотнее данные, тем мельче отметки,
+     * и линия остаётся видна на любом периоде.
      *
-     * Разброс намеренно небольшой: при сильной разнице крупные отметки
-     * снова начали бы слипаться на периоде в сорок дней — ровно та беда,
-     * из-за которой в версии 3.6 все точки сделали одинаковыми.
+     * Начало дня показывает не размер, а форма — квадрат вместо кружка,
+     * плюс штриховая вертикальная линия.
      * -------------------------------------------------------------------- */
-    POINT_BASE: 5,
-    POINT_FIRST: 5.5,   // первое измерение дня: +10%
-    POINT_REST: 4,      // остальные измерения дня: −20%
+    pointSize: function (count) {
+        if (count <= 20) return 5;
+        if (count <= 50) return 3;
+        if (count <= 100) return 2;
+        return 1.5;
+    },
+
+    /* ----------------------------------------------------------------------
+     * Квадрат Chart.js рисует вписанным в окружность того же радиуса,
+     * поэтому при одинаковом числе он выглядит примерно на треть мельче
+     * кружка. Множитель возвращает квадрату тот же видимый размер:
+     * отличается форма, а не величина отметки.
+     * -------------------------------------------------------------------- */
+    SQUARE_K: 1.41,
 
     /* ----------------------------------------------------------------------
      * Цвет каждой точки по отклонению от индивидуальной нормы.
@@ -532,6 +543,9 @@ var Graphs = {
         var fill = [];
         var border = [];
         var radius = [];
+        var style = [];
+
+        var size = Graphs.pointSize(values.length);
 
         for (var i = 0; i < values.length; i++) {
             var v = values[i];
@@ -546,10 +560,12 @@ var Graphs = {
             fill.push(Graphs.POINT[level]);
             border.push(level ? Graphs.POINT[level] : serie.color);
 
+            // Первое измерение дня — квадрат, остальные — кружок
             var firstOfDay = (i === 0) || (points[i].date !== points[i - 1].date);
-            radius.push(firstOfDay ? Graphs.POINT_FIRST : Graphs.POINT_REST);
+            style.push(firstOfDay ? 'rect' : 'circle');
+            radius.push(firstOfDay ? size * Graphs.SQUARE_K : size);
         }
-        return { fill: fill, border: border, radius: radius };
+        return { fill: fill, border: border, radius: radius, style: style, size: size };
     },
 
     /* ----------------------------------------------------------------------
@@ -644,8 +660,9 @@ var Graphs = {
                 borderDash: serie.dashed ? [6, 4] : [],
                 pointBackgroundColor: colors.fill,
                 pointBorderColor: colors.border,
-                pointBorderWidth: 2,
+                pointBorderWidth: (colors.size <= 2.5) ? 1 : 2,
                 pointRadius: colors.radius,
+                pointStyle: colors.style,
                 pointHoverRadius: 7,
                 fill: false,
                 spanGaps: true,
@@ -820,7 +837,7 @@ var Graphs = {
 
             body += '<p style="text-align:center;font-size:12px;color:#555">' +
                 '◯ норма · ● внимание (жёлтая точка) · ● критично (красная точка). ' +
-                'Крупная точка — первое измерение дня, штриховая линия — граница дня.</p>';
+                'Квадрат — первое измерение дня, штриховая линия — граница дня.</p>';
 
             body += '<table class="grid"><tr>' +
                 '<th>Всего измерений</th><th>Минимум</th><th>Максимум</th><th>Среднее</th>' +

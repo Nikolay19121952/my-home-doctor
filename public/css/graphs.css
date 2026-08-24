@@ -333,14 +333,6 @@
     border: 2px solid #D32F2F;
 }
 
-/* Крупная точка — первое измерение дня (ТЗ v3.6, п. 2) */
-.gr-pdot-first {
-    width: 17px;
-    height: 17px;
-    background: #FFFFFF;
-    border: 2px solid #0D47A1;
-}
-
 /* Штриховая линия — граница дня (ТЗ v3.6, п. 2) */
 .gr-daydash {
     display: inline-block;
@@ -348,5 +340,16 @@
     height: 0;
     border-top: 2px dashed #90A4AE;
     vertical-align: 4px;
+    margin-right: 3px;
+}
+
+/* Квадрат — первое измерение дня (ТЗ v3.6, доработка) */
+.gr-psq {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background: #FFFFFF;
+    border: 2px solid #0D47A1;
+    vertical-align: -1px;
     margin-right: 3px;
 }
