@@ -340,3 +340,13 @@
     background: #FFFFFF;
     border: 2px solid #0D47A1;
 }
+
+/* Штриховая линия — граница дня (ТЗ v3.6, п. 2) */
+.gr-daydash {
+    display: inline-block;
+    width: 18px;
+    height: 0;
+    border-top: 2px dashed #90A4AE;
+    vertical-align: 4px;
+    margin-right: 3px;
+}

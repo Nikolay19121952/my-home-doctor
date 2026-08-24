@@ -402,7 +402,7 @@ var Graphs = {
             '<span class="gr-pdot gr-pdot-warn"></span> внимание · ' +
             '<span class="gr-pdot gr-pdot-danger"></span> критично' +
             '<br><span class="gr-pdot gr-pdot-first"></span> крупная точка — ' +
-            'первое измерение дня</p>';
+            'первое измерение дня · <span class="gr-daydash"></span> граница дня</p>';
     },
 
     statBox: function (label, value) {
@@ -552,6 +552,55 @@ var Graphs = {
         return { fill: fill, border: border, radius: radius };
     },
 
+    /* ----------------------------------------------------------------------
+     * Штриховая линия на каждой смене дня (ТЗ v3.6, пункт 2, доработка).
+     *
+     * Обычная сетка Chart.js рисуется только под теми подписями оси,
+     * которые остались после прореживания: на периоде в сорок дней часть
+     * подписей скрывается, и вместе с ними пропали бы границы дней.
+     * Поэтому линии рисует отдельная надстройка — по номерам точек,
+     * независимо от того, какие подписи видны.
+     *
+     * Линия штриховая и серая, чтобы её нельзя было принять за данные.
+     * -------------------------------------------------------------------- */
+    dayLines: {
+        id: 'dayLines',
+        beforeDatasetsDraw: function (chart, args, opts) {
+            var flags = opts && opts.flags;
+            if (!flags || !flags.length) return;
+
+            var xScale = chart.scales.x;
+            var area = chart.chartArea;
+            var ctx = chart.ctx;
+            if (!xScale || !area) return;
+
+            ctx.save();
+            ctx.strokeStyle = '#90A4AE';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 3]);
+
+            for (var i = 0; i < flags.length; i++) {
+                if (!flags[i]) continue;
+                var px = xScale.getPixelForValue(i);
+                // Линию у самого левого края не рисуем: там уже ось
+                if (px <= area.left + 2 || px >= area.right) continue;
+
+                ctx.beginPath();
+                ctx.moveTo(px, area.top);
+                ctx.lineTo(px, area.bottom);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+    },
+
+    /* Номера точек, с которых начинается новый день */
+    dayFlags: function (points) {
+        return points.map(function (m, i) {
+            return (i === 0) || (m.date !== points[i - 1].date);
+        });
+    },
+
     draw: function (index) {
         var canvas = document.getElementById('gr-canvas-' + index);
         var meta = Graphs._metas[index];
@@ -613,12 +662,15 @@ var Graphs = {
         return new Chart(canvas.getContext('2d'), {
             type: 'line',
             data: { labels: labels, datasets: datasets },
+            plugins: [Graphs.dayLines],
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: false,          // ускоряет отрисовку и печать
                 interaction: { intersect: false, mode: 'index' },
                 plugins: {
+                    // Границы дней рисуются только когда день не один
+                    dayLines: { flags: multiDay ? Graphs.dayFlags(points) : null },
                     title: {
                         display: true,
                         text: p.name,
@@ -768,7 +820,7 @@ var Graphs = {
 
             body += '<p style="text-align:center;font-size:12px;color:#555">' +
                 '◯ норма · ● внимание (жёлтая точка) · ● критично (красная точка). ' +
-                'Крупная точка — первое измерение дня.</p>';
+                'Крупная точка — первое измерение дня, штриховая линия — граница дня.</p>';
 
             body += '<table class="grid"><tr>' +
                 '<th>Всего измерений</th><th>Минимум</th><th>Максимум</th><th>Среднее</th>' +
