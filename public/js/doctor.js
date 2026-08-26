@@ -338,7 +338,7 @@ var Doctor = {
                     }
 
                     history.push({ role: 'user', content: text, at: Doctor.stamp() });
-                    history.push({ role: 'assistant', content: reply, at: Doctor.stamp() });
+                    history.push({ role: 'assistant', content: reply, at: Doctor.stamp(), part: hasMore });
                     var trimmed = false;
                     if (history.length > 40) {
                         history = history.slice(history.length - 40);
@@ -353,7 +353,7 @@ var Doctor = {
 
                     if (hasMore) {
                         Doctor._accumulatedParts.push(reply);
-                        Doctor.addBubble('assistant', reply, false);
+                        Doctor.addBubble('assistant', reply, false, undefined, undefined, history[idx].at);
                         Doctor._autoSend(history);
                     } else if (Doctor._accumulatedParts.length > 0) {
                         Doctor._accumulatedParts.push(reply);
@@ -436,8 +436,10 @@ var Doctor = {
                         reply = reply.replace(MARKER, '').trim();
                     }
 
-                    history.push({ role: 'user', content: 'Продолжай', at: Doctor.stamp() });
-                    history.push({ role: 'assistant', content: reply, at: Doctor.stamp() });
+                    // auto: служебный запрос, а не слова пользователя —
+                    // в переписке он не показывается
+                    history.push({ role: 'user', content: 'Продолжай', at: Doctor.stamp(), auto: true });
+                    history.push({ role: 'assistant', content: reply, at: Doctor.stamp(), part: hasMore });
                     if (history.length > 40) {
                         history = history.slice(history.length - 40);
                     }
@@ -654,15 +656,60 @@ var Doctor = {
 
         // Разделитель дня и время каждого сообщения (ТЗ v3.4, пункт 13)
         var lastDay = '';
+        var parts = [];
         for (var i = 0; i < history.length; i++) {
-            var day = Doctor.dayOf(history[i].at);
+            var h = history[i];
+
+            // Служебный запрос «Продолжай» приложение посылает само,
+            // чтобы добрать хвост длинного документа. Это не реплика
+            // пользователя, и в переписке ей не место
+            if (Doctor.isAuto(h)) continue;
+
+            var day = Doctor.dayOf(h.at);
             if (day && day !== lastDay) {
-                Doctor.addDaySeparator(container, history[i].at);
+                // Внутри одного документа разделитель не ставим,
+                // даже если его выдача перевалила за полночь
+                if (parts.length === 0) Doctor.addDaySeparator(container, h.at);
                 lastDay = day;
             }
-            Doctor.addBubble(history[i].role, history[i].content,
-                undefined, undefined, i, history[i].at);
+
+            if (Doctor.isPart(history, i)) {
+                // Промежуточный кусок документа: без кнопок; время —
+                // только у первого куска, дальше оно чужеродно в тексте
+                Doctor.addBubble('assistant', h.content, false, undefined, undefined,
+                    parts.length === 0 ? h.at : undefined);
+                parts.push(h.content);
+                continue;
+            }
+
+            if (h.role === 'assistant' && parts.length > 0) {
+                // Последний кусок: кнопки под ним работают с документом целиком
+                parts.push(h.content);
+                Doctor.addBubble('assistant', h.content, true, parts.join('\n\n'), i);
+                parts = [];
+                continue;
+            }
+
+            Doctor.addBubble(h.role, h.content, undefined, undefined, i, h.at);
         }
+    },
+
+    /* Служебное «Продолжай», отправленное самим приложением.
+       У переписки, записанной до версии 3.10, флага нет — там такое
+       сообщение опознаётся по тексту. Если пользователь напишет
+       «Продолжай» сам, его реплика скроется, но ответ доктора останется */
+    isAuto: function (h) {
+        return h.role === 'user' && (h.auto === true || h.content === 'Продолжай');
+    },
+
+    /* Кусок длинного документа, за которым последует продолжение */
+    isPart: function (history, i) {
+        var h = history[i];
+        if (h.role !== 'assistant') return false;
+        if (h.part === true) return true;
+        if (h.part === false) return false;
+        var next = history[i + 1];
+        return !!(next && Doctor.isAuto(next));
     },
 
     /* ======================================================================
@@ -815,8 +862,14 @@ var Doctor = {
                 if (index < 0 || index >= history.length) return;
 
                 var from = index;
+                // У длинного документа перед последним куском лежат остальные
+                // куски и служебные «Продолжай» — консультация удаляется целиком
+                while (from > 0 &&
+                    (Doctor.isAuto(history[from - 1]) || Doctor.isPart(history, from - 1))) {
+                    from--;
+                }
                 // Захватываем вопрос пользователя, который был перед ответом
-                if (index > 0 && history[index - 1].role === 'user') from = index - 1;
+                if (from > 0 && history[from - 1].role === 'user') from--;
                 history.splice(from, index - from + 1);
 
                 Doctor.saveHistory(history);

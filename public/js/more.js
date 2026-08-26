@@ -817,14 +817,14 @@ var More = {
         html += '<div class="about-section">' +
             '<div class="about-logo">🩺</div>' +
             '<h3>Мой домашний доктор</h3>' +
-            '<p class="about-version">Версия 3.9 · август 2026</p>' +
+            '<p class="about-version">Версия 3.10 · август 2026</p>' +
             '</div>';
 
         // ТЕКУЩАЯ ВЕРСИЯ
         html += '<div class="about-card">' +
             '<h3>📌 Текущая версия</h3>' +
             '<ul class="about-facts">' +
-            '<li><strong>Версия:</strong> 3.9</li>' +
+            '<li><strong>Версия:</strong> 3.10</li>' +
             '<li><strong>Дата выпуска:</strong> август 2026</li>' +
             '<li><strong>Статус:</strong> работает в production</li>' +
             '<li><strong>Показатели дневника:</strong> 8 — давление верхнее и нижнее, ' +
@@ -1094,7 +1094,7 @@ var More = {
             '<div class="about-release">' +
             '<div class="about-release-head"><span class="about-release-ver">v3.9</span>' +
             '<span class="about-release-date">август 2026</span>' +
-            '<span class="about-release-status about-done">текущая</span></div>' +
+            '<span class="about-release-status about-done">выпущена</span></div>' +
             '<ul><li>Выбор дней теперь следует за периодом: после кнопки ' +
             '«Показать» отмечены ровно те дни, что попали в период</li>' +
             '<li>График строится по тому периоду, который виден на экране</li>' +
@@ -1105,6 +1105,19 @@ var More = {
             'кружком; размер одинаковый</li>' +
             '<li>На смене дня график пересекает штриховая линия — ' +
             'границы дней видны при любой длине периода</li></ul></div>' +
+
+            '<div class="about-release">' +
+            '<div class="about-release-head"><span class="about-release-ver">v3.10</span>' +
+            '<span class="about-release-date">август 2026</span>' +
+            '<span class="about-release-status about-done">текущая</span></div>' +
+            '<ul><li>Длинный документ доктора читается сплошным текстом: ' +
+            'на стыке частей больше нет служебного «Продолжай», ' +
+            'времени и кнопок</li>' +
+            '<li>Кнопки «Копировать» и «Печать / Файл» стоят один раз — ' +
+            'под концом документа — и работают со всем документом целиком, ' +
+            'а не с последним куском</li>' +
+            '<li>«Удалить» убирает документ целиком вместе с вопросом, ' +
+            'а не только его хвост</li></ul></div>' +
 
             '</div></div>';
 
@@ -1130,7 +1143,7 @@ var More = {
         html += '<div class="about-card">' +
             '<h3>🗺️ План развития</h3>' +
             '<ul class="about-facts">' +
-            '<li><strong>v3.9</strong> — август 2026, текущая версия</li>' +
+            '<li><strong>v3.10</strong> — август 2026, текущая версия</li>' +
             '<li><strong>v4.0</strong> — облачная синхронизация без ручного переноса файлов, ' +
             'интерактивные графики и сравнение нескольких показателей</li>' +
             '<li><strong>v4.1</strong> — мобильное приложение или расширение возможностей</li>' +
