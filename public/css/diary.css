@@ -352,6 +352,20 @@
     flex-shrink: 0;
 }
 
+/* Кнопка ЭКГ занимает всю ширину строки: название длинное, а в общей
+   сетке оно растянуло бы по высоте все соседние кнопки */
+.dv-btn-ecg {
+    grid-column: 1 / -1;
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.dv-btn-ecg:hover,
+.dv-btn-ecg:focus {
+    background: var(--color-primary);
+    color: #fff;
+}
+
 .dv-btn-main {
     background: var(--color-primary);
     border-color: var(--color-primary);
