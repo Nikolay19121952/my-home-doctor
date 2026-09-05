@@ -7,6 +7,47 @@ var PORT = process.env.PORT || 3000;
 var API_KEY = process.env.ANTHROPIC_API_KEY || '';
 var ACCESS_CODE = process.env.ACCESS_CODE || '';
 
+/* ----------------------------------------------------------------------
+ * ВЫБОР ПОСТАВЩИКА МОДЕЛИ
+ *
+ * Приложение говорит на языке Anthropic Messages API. На этом же языке
+ * отвечает DeepSeek по адресу https://api.deepseek.com/anthropic —
+ * трафик там дешевле и не нужен VPN. Поставщик меняется переменными
+ * окружения на хостинге, без правки кода:
+ *
+ *   AI_BASE_URL = https://api.deepseek.com/anthropic
+ *   AI_MODEL    = deepseek-v4-pro
+ *
+ * Без этих переменных работает Anthropic, как и прежде.
+ *
+ * Важное различие: PDF-вложения понимает только Anthropic. У DeepSeek
+ * блоки document игнорируются, зато картинки читаются — расшифровку
+ * анализов и ЭКГ там нужно присылать снимком, а не файлом PDF.
+ * -------------------------------------------------------------------- */
+var BASE_URL = (process.env.AI_BASE_URL || 'https://api.anthropic.com').replace(/\/+$/, '');
+var MODEL = process.env.AI_MODEL || 'claude-haiku-4-5-20251001';
+var MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS, 10) || 8192;
+
+var API_HOST, API_PATH;
+try {
+    var parsedUrl = new (require('url').URL)(BASE_URL);
+    API_HOST = parsedUrl.hostname;
+    API_PATH = parsedUrl.pathname.replace(/\/+$/, '') + '/v1/messages';
+} catch (e) {
+    console.error('Неверный AI_BASE_URL:', BASE_URL, '—', e.message);
+    API_HOST = 'api.anthropic.com';
+    API_PATH = '/v1/messages';
+}
+
+/* PDF читает только Anthropic. Переопределяется через AI_PDF=1 / AI_PDF=0,
+   если поставщик изменит поведение */
+var SUPPORTS_PDF = process.env.AI_PDF
+    ? process.env.AI_PDF === '1'
+    : API_HOST === 'api.anthropic.com';
+
+console.log('Модель: ' + MODEL + ' через ' + API_HOST + API_PATH +
+    ' (PDF: ' + (SUPPORTS_PDF ? 'да' : 'нет') + ')');
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -113,6 +154,20 @@ app.post('/api/chat', function (req, res) {
         });
     }
 
+    // У поставщика без поддержки PDF файл молча пропадёт из запроса,
+    // и доктор ответит, что документа не видит. Лучше сказать прямо
+    if (!SUPPORTS_PDF) {
+        for (var p = 0; p < files.length; p++) {
+            var mt = files[p].mediaType || '';
+            if (mt.indexOf('image/') !== 0) {
+                return res.status(400).json({
+                    error: 'Выбранная модель не читает файлы PDF. ' +
+                        'Сфотографируйте документ и прикрепите снимок (JPG или PNG).'
+                });
+            }
+        }
+    }
+
     var userContent;
     if (files.length > 0) {
         userContent = [];
@@ -137,18 +192,16 @@ app.post('/api/chat', function (req, res) {
     }
     messages.push({ role: 'user', content: userContent });
 
-    var maxTokens = 8192;
-
     var requestBody = JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: maxTokens,
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
         system: systemContent,
         messages: messages
     });
 
     var options = {
-        hostname: 'api.anthropic.com',
-        path: '/v1/messages',
+        hostname: API_HOST,
+        path: API_PATH,
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -170,7 +223,16 @@ app.post('/api/chat', function (req, res) {
                     console.error('API error:', apiRes.statusCode, errMsg);
                     return res.status(apiRes.statusCode || 400).json({ error: errMsg });
                 }
-                var reply = parsed.content && parsed.content[0] && parsed.content[0].text;
+                // Берём первый текстовый блок, а не первый попавшийся:
+                // модель может вернуть перед ним блок с размышлениями
+                var reply = '';
+                var blocks = parsed.content || [];
+                for (var b = 0; b < blocks.length; b++) {
+                    if (blocks[b] && blocks[b].type === 'text' && blocks[b].text) {
+                        reply = blocks[b].text;
+                        break;
+                    }
+                }
                 if (!reply) {
                     console.error('Empty reply:', JSON.stringify(parsed).substring(0, 500));
                 }
