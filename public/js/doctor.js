@@ -157,7 +157,9 @@ var Doctor = {
             var profile = a.profileId ? Storage.getProfileById(a.profileId) : null;
             var parts = ['— ' + a.name];
             if (a.date) parts.push('дата: ' + a.date);
-            if (profile) parts.push('пациент: ' + profile.name);
+            if (profile && profile.id !== Storage.getActiveId()) {
+                parts.push('обследование другого члена семьи');
+            }
             lines.push(parts.join(', '));
             if (a.result) {
                 lines.push('  Результат: ' + a.result);
@@ -225,7 +227,19 @@ var Doctor = {
      * С версии 3.1 передаются данные только активного профиля: чат ведётся
      * с конкретным членом семьи, и отправлять доктору карты всех остальных
      * ни к чему — это и лишний контекст, и чужие персональные данные.
+     *
+     * С версии 3.12 запрос обезличен: ФИО за пределы устройства не уходит.
+     * Для консультации оно не нужно — доктору важны возраст, пол, рост,
+     * диагнозы и лекарства. ФИО остаётся в localStorage, показывается
+     * в заголовках и печатается в документах, но в запрос не попадает.
      * -------------------------------------------------------------------- */
+
+    /* Обозначение пациента в запросе вместо ФИО */
+    anonLabel: function (profile) {
+        var activeId = Storage.getActiveId();
+        return (profile && profile.id === activeId) ? 'Пациент' : 'Член семьи';
+    },
+
     getProfileContext: function () {
         var active = Storage.getActiveProfile();
         var profiles = active ? [active] : Storage.getProfiles();
@@ -234,7 +248,7 @@ var Doctor = {
         var lines = [active ? 'Сведения о пациенте:' : 'Профили пациентов в семье:'];
         for (var i = 0; i < profiles.length; i++) {
             var p = profiles[i];
-            var parts = ['— ' + p.name];
+            var parts = ['— ' + Doctor.anonLabel(p)];
             if (p.birthDate) {
                 var age = UI.calculateAge(p.birthDate);
                 if (age !== null) parts.push(UI.pluralAge(age));

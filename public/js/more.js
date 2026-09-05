@@ -817,14 +817,14 @@ var More = {
         html += '<div class="about-section">' +
             '<div class="about-logo">🩺</div>' +
             '<h3>Мой домашний доктор</h3>' +
-            '<p class="about-version">Версия 3.11 · август 2026</p>' +
+            '<p class="about-version">Версия 3.12 · сентябрь 2026</p>' +
             '</div>';
 
         // ТЕКУЩАЯ ВЕРСИЯ
         html += '<div class="about-card">' +
             '<h3>📌 Текущая версия</h3>' +
             '<ul class="about-facts">' +
-            '<li><strong>Версия:</strong> 3.11</li>' +
+            '<li><strong>Версия:</strong> 3.12</li>' +
             '<li><strong>Дата выпуска:</strong> август 2026</li>' +
             '<li><strong>Статус:</strong> работает в production</li>' +
             '<li><strong>Показатели дневника:</strong> 8 — давление верхнее и нижнее, ' +
@@ -1127,7 +1127,7 @@ var More = {
             '<div class="about-release">' +
             '<div class="about-release-head"><span class="about-release-ver">v3.11</span>' +
             '<span class="about-release-date">август 2026</span>' +
-            '<span class="about-release-status about-done">текущая</span></div>' +
+            '<span class="about-release-status about-done">выпущена</span></div>' +
             '<ul><li>В дневнике появилась кнопка «❤️ Запись ЭКГ с домашнего ' +
             'электрокардиографа» — переход прямо к разделу обследований, ' +
             'минуя меню «Ещё»</li>' +
@@ -1136,6 +1136,18 @@ var More = {
             'и в заголовке самого раздела</li>' +
             '<li>Инструкция в разделе «О приложении» приведена в соответствие ' +
             'с последними выпусками</li></ul></div>' +
+
+            '<div class="about-release">' +
+            '<div class="about-release-head"><span class="about-release-ver">v3.12</span>' +
+            '<span class="about-release-date">сентябрь 2026</span>' +
+            '<span class="about-release-status about-done">текущая</span></div>' +
+            '<ul><li>Запрос к доктору обезличен: ФИО пациента больше не покидает ' +
+            'устройство. Доктору передаются возраст, пол, рост, диагнозы, ' +
+            'лекарства и аллергии — всё, что нужно для консультации</li>' +
+            '<li>Доктор больше не спрашивает имя, фамилию и другие ' +
+            'опознавательные сведения</li>' +
+            '<li>ФИО по-прежнему видно в заголовках приложения и в печатных ' +
+            'документах — оно хранится только в вашем браузере</li></ul></div>' +
 
             '</div></div>';
 
@@ -1161,7 +1173,7 @@ var More = {
         html += '<div class="about-card">' +
             '<h3>🗺️ План развития</h3>' +
             '<ul class="about-facts">' +
-            '<li><strong>v3.11</strong> — август 2026, текущая версия</li>' +
+            '<li><strong>v3.12</strong> — сентябрь 2026, текущая версия</li>' +
             '<li><strong>v4.0</strong> — облачная синхронизация без ручного переноса файлов, ' +
             'интерактивные графики и сравнение нескольких показателей</li>' +
             '<li><strong>v4.1</strong> — мобильное приложение или расширение возможностей</li>' +
